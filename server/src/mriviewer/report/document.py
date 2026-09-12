@@ -120,7 +120,7 @@ def iter_generate_document(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
     from ..morph.service import compute_and_store
 
     tpl: ReportTemplate = load_template(cfg, TEMPLATE_KEY)
-    total = 2 + len(tpl.chapters)
+    total = 3 + len(tpl.chapters)
 
     yield {"stage": "morphometry", "labelZh": "测量软骨形态学", "done": 0, "total": total}
     morph = compute_and_store(conn, cfg, seg_id)
@@ -140,7 +140,15 @@ def iter_generate_document(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
     errors: dict[str, str] = {}
     cart_spec = tpl.chapter("cartilage")
     ai_rep = None
-    yield {"stage": "cartilage_ai", "labelZh": "软骨报告（模型撰写）", "done": 1, "total": total}
+    # The 3D reconstruction in the report is rendered by the browser from the
+    # cached display meshes; build them now so the PDF renderer only reads.
+    yield {"stage": "mesh", "labelZh": "三维表面", "done": 1, "total": total}
+    try:
+        _ensure_meshes(conn, cfg, seg_id)
+    except Exception as exc:                      # noqa: BLE001 - a report without 3D is still a report
+        errors["mesh"] = "%s: %s" % (type(exc).__name__, exc)
+
+    yield {"stage": "cartilage_ai", "labelZh": "软骨报告（模型撰写）", "done": 2, "total": total}
     try:
         ai_rep = generate_report(conn, cfg, seg_id,
                                  banned_terms=tpl.banned_terms_for("cartilage"))
@@ -163,7 +171,7 @@ def iter_generate_document(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
     chapters = []
     for i, spec in enumerate(tpl.chapters):
         yield {"stage": "chapter", "chapter": spec.id, "labelZh": spec.title_zh,
-               "done": 2 + i, "total": total}
+               "done": 3 + i, "total": total}
         chapters.append(resolve(spec, ctx))
     failed = [c["id"] for c in chapters if c["status"] == "failed"]
     status = "partial" if failed else "ok"
@@ -352,3 +360,22 @@ def review_document(conn: sqlite3.Connection, doc_id: int, state: str,
     out = get_document_by_id(conn, doc_id)
     assert out is not None
     return out
+
+
+def _ensure_meshes(conn: sqlite3.Connection, cfg: Any, seg_id: int) -> None:
+    """Build the display meshes unless the current pipeline's are cached."""
+    from ..seg.mesh import MESH_PIPELINE_VERSION, build_meshes_for_segmentation
+    from ..volume.cache import VolumeCache
+
+    row = conn.execute("SELECT seg_key FROM segmentation WHERE id=?", (seg_id,)).fetchone()
+    if row is None or not row["seg_key"]:
+        return
+    rows = conn.execute(
+        "SELECT label_value, params_json FROM segmentation_mesh WHERE segmentation_id=?",
+        (seg_id,)).fetchall()
+    cache = VolumeCache(cfg.cache_dir)
+    current = [r for r in rows
+               if (json.loads(r["params_json"] or "{}").get("pipeline") == MESH_PIPELINE_VERSION
+                   and cache.mesh_path(row["seg_key"], r["label_value"]).exists())]
+    if not current:
+        build_meshes_for_segmentation(conn, cfg, seg_id)

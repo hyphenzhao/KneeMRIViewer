@@ -14,11 +14,11 @@ from scipy.ndimage import map_coordinates
 
 from .frame import KneeFrame, knee_frame, native_spacing_along
 from .geometry import dense_surface, iso_fields, normals_to_lps, to_lps, vertex_areas
-from .parcellation import SUBREGION_NAMES, parcellate
+from .parcellation import SUBREGION_NAMES, anatomic_axes, parcellate
 from .probe import PLATES, RELIABLE_RES_MM, TAU_BONE_MM
 from .thickness import histogram, thickness_map, weighted_stats
 
-ALGO_VERSION = "morph-0.2.0"
+ALGO_VERSION = "morph-0.3.0"
 
 # A subregion needs at least this many native slices before its mean thickness
 # is reported without a low-confidence flag. Three is the minimum that can
@@ -44,18 +44,46 @@ class PlateResult:
     lesions: list[dict[str, Any]] = field(default_factory=list)
 
 
+@dataclass
+class PlateArrays:
+    """The per-vertex working set of one plate, for drawing from.
+
+    Never serialised and never stored: tens of thousands of vertices per
+    plate, kept only as long as it takes ``morph.figures`` to rasterise them
+    in the same process that measured them. Every figure is therefore drawn
+    from exactly the vertices the numbers came from.
+    """
+    label: int
+    name: str
+    axes: np.ndarray            # anatomic axes, +ML medial (parcellation.anatomic_axes)
+    points_lps: np.ndarray      # (N, 3) interface vertices, patient LPS mm
+    points_af: np.ndarray       # (N, 3) the same in (ML, AP, SI)
+    th: np.ndarray              # thickness per vertex, NaN where the ray escaped
+    areas: np.ndarray           # mm^2 per vertex
+    res_eff: np.ndarray         # effective native resolution along the normal
+    codes: np.ndarray           # subregion code per vertex
+    boundary: np.ndarray        # plate-margin vertices
+    frame2d: dict[str, Any]     # the parcellation's own 2D chart
+    lesions: list[Any]          # outerbridge.Lesion, with their vertex points
+
+
 # bone label -> the cartilage plates that sit on it
 PLATES_OF_BONE = {1: [4, 5], 2: [6, 7], 3: [8]}
 
 
 def compute_morphometry(canonical: np.ndarray, geom,
                         header_laterality: str | None = None,
-                        *, strict: bool = True, grading: Any = None) -> dict[str, Any]:
+                        *, strict: bool = True, grading: Any = None,
+                        keep_arrays: bool = False) -> dict[str, Any]:
     """Full metric tree for one segmentation.
 
     Raises when the medial/lateral labels look swapped: a mirrored subregion
     report is worse than no report at all, because it is wrong in a way that
     reads as plausible.
+
+    With ``keep_arrays`` the tree also carries ``"arrays"`` (label ->
+    ``PlateArrays``), the per-vertex data the figures are drawn from. It is
+    not JSON and the caller must pop it before storing anything.
     """
     masks = {int(v): (canonical == v) for v in np.unique(canonical) if v != 0}
     frame = knee_frame(masks, geom, header_laterality)
@@ -89,6 +117,7 @@ def compute_morphometry(canonical: np.ndarray, geom,
             coverage[bone] = cov
 
     plates: list[PlateResult] = []
+    arrays: dict[int, PlateArrays] = {}
     for cart, (bone, name) in PLATES.items():
         if cart not in masks or bone not in masks:
             continue
@@ -97,9 +126,10 @@ def compute_morphometry(canonical: np.ndarray, geom,
         result = _one_plate(masks, geom, frame, cart, bone, name, voxel_mm3,
                             grading=grading, denuded_patches=patches)
         if result is not None:
-            plates.append(result)
+            plates.append(result[0])
+            arrays[cart] = result[1]
 
-    return {
+    tree: dict[str, Any] = {
         "algoVersion": ALGO_VERSION,
         "frame": frame.to_json(),
         "plates": [asdict(p) for p in plates],
@@ -108,11 +138,15 @@ def compute_morphometry(canonical: np.ndarray, geom,
         "grading": {"scale": "outerbridge_mri_thickness", "params": grading.to_json(),
                     "gradeIAssessable": False, "detectionFloorMm": float(geom.spacing[2])},
     }
+    if keep_arrays:
+        tree["arrays"] = arrays
+    return tree
 
 
 def _one_plate(masks, geom, frame: KneeFrame, cart: int, bone: int, name: str,
                voxel_mm3: float, *, grading: Any = None,
-               denuded_patches: list[Any] | None = None) -> PlateResult | None:
+               denuded_patches: list[Any] | None = None
+               ) -> tuple[PlateResult, PlateArrays] | None:
     from .outerbridge import GradingParams, grade_plate
     grading = grading or GradingParams()
     fields, grid = iso_fields(masks, geom, [cart, bone])
@@ -185,6 +219,11 @@ def _one_plate(masks, geom, frame: KneeFrame, cart: int, bone: int, name: str,
             subregions[code]["outerbridge"] = g
 
     reliable_all = float(areas[res_eff <= RELIABLE_RES_MM].sum() / areas.sum())
+    axes = anatomic_axes(frame)
+    plate_arrays = PlateArrays(
+        label=cart, name=name, axes=axes, points_lps=points_lps,
+        points_af=points_lps @ axes.T, th=th, areas=areas, res_eff=res_eff,
+        codes=parc.codes, boundary=boundary, frame2d=parc.frame2d, lesions=lesions)
     return PlateResult(
         label=cart, name=name,
         volume_mm3=round(float(masks[cart].sum()) * voxel_mm3, 1),
@@ -204,7 +243,7 @@ def _one_plate(masks, geom, frame: KneeFrame, cart: int, bone: int, name: str,
         },
         grading=grading_summary,
         lesions=[l.to_json() for l in lesions],
-    )
+    ), plate_arrays
 
 
 def _confidence(slice_support: int, reliable_fraction: float,

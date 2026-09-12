@@ -123,3 +123,24 @@ def test_every_emitted_code_has_a_chinese_label() -> None:
     ):
         for code in {c for c in fn(points, slices).codes.tolist() if c}:
             assert code in SUBREGION_NAMES, code
+
+
+def test_femur_cartilage_crossing_the_anterior_origin_is_not_split() -> None:
+    """A lateral condyle whose trochlea reaches past 0 deg (anterior).
+
+    Without moving the angular origin, vertices at -5 deg read as 355 deg
+    and land in the posterior subregion - a trochlear patch reported as
+    posterior femur, with nothing else looking wrong.
+    """
+    rng = np.random.default_rng(3)
+    n = 4000
+    theta = rng.uniform(np.deg2rad(-12.0), np.deg2rad(190.0), n)
+    ml = rng.uniform(-12.0, 12.0, n)
+    points = np.stack([ml, 18.0 * np.cos(theta), -18.0 * np.sin(theta)], axis=1)
+    parc = parcellate_femur(points, np.round(ml / 3.0).astype(int), medial=False)
+    front = np.degrees(theta) < 0
+    assert (parc.codes[front] == "LFT").all()
+    back = np.degrees(theta) > 170
+    assert (parc.codes[back] == "pLF").all()
+    assert set(c for c in parc.codes.tolist() if c) == {"LFT", "ecLF", "ccLF", "icLF", "pLF"}
+

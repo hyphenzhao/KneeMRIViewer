@@ -124,7 +124,8 @@ class Config:
     def ensure_dirs(self) -> None:
         for p in (self.state_dir, self.cache_dir, self.derived_dir,
                   self.cache_dir / "vol", self.cache_dir / "seg",
-                  self.cache_dir / "mesh", self.cache_dir / "thumb"):
+                  self.cache_dir / "mesh", self.cache_dir / "thumb",
+                  self.cache_dir / "fig"):
             p.mkdir(parents=True, exist_ok=True)
 
 

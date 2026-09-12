@@ -20,7 +20,7 @@ mostly cancels it. The price: a plate that is thin everywhere has little
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 import numpy as np
@@ -84,9 +84,12 @@ class Lesion:
     n_slices: int
     centroid_lps: list[float]
     confidence: str
+    # The vertices the lesion is made of (LPS mm), so it can be drawn. Not
+    # part of the JSON: the numbers above are the record, this is the picture.
+    points_lps: Any = field(default=None, repr=False, compare=False)
 
     def to_json(self) -> dict[str, Any]:
-        d = asdict(self)
+        d = {k: v for k, v in self.__dict__.items() if k != "points_lps"}
         d["area_mm2"] = round(d["area_mm2"], 1)
         d["median_deficit_pct"] = round(d["median_deficit_pct"], 0)
         if d["min_thickness_mm"] is not None:
@@ -256,7 +259,8 @@ def grade_plate(*, th: np.ndarray, areas: np.ndarray, res_eff: np.ndarray,
                 lesions.append(Lesion(
                     code=code, grade=grade, area_mm2=area, median_deficit_pct=100 * med,
                     min_thickness_mm=float(np.nanmin(th[m])), n_slices=n_sl,
-                    centroid_lps=points_lps[m].mean(0).tolist(), confidence=conf))
+                    centroid_lps=points_lps[m].mean(0).tolist(), confidence=conf,
+                    points_lps=points_lps[m]))
 
     for p in denuded_patches:
         if getattr(p, "enclosure", 1.0) < params.min_enclosure:
@@ -265,7 +269,8 @@ def grade_plate(*, th: np.ndarray, areas: np.ndarray, res_eff: np.ndarray,
             code=getattr(p, "code", "") or "", grade="IV", area_mm2=float(p.area_mm2),
             median_deficit_pct=100.0, min_thickness_mm=0.0, n_slices=int(p.n_slices),
             centroid_lps=list(p.centroid_lps),
-            confidence="low" if p.n_slices < params.min_lesion_slices else "medium"))
+            confidence="low" if p.n_slices < params.min_lesion_slices else "medium",
+            points_lps=getattr(p, "points_lps", None)))
 
     grades: dict[str, dict[str, Any]] = {}
     for c in all_codes:

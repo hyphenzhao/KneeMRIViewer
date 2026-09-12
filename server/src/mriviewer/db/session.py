@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterable
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 _SCHEMA = Path(__file__).with_name("schema.sql")
 
 
@@ -30,6 +30,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
     conn = connect(db_path)
     _migrate_report_fts(conn)
     _migrate_ai_report_single_row(conn)
+    _migrate_add_columns(conn)
     conn.executescript(_SCHEMA.read_text(encoding="utf-8"))
     conn.execute(
         "INSERT OR REPLACE INTO kv(key,value) VALUES('schema_version',?)",
@@ -67,6 +68,26 @@ def one(conn: sqlite3.Connection, sql: str, params: Iterable[Any] = ()) -> sqlit
 
 def all_rows(conn: sqlite3.Connection, sql: str, params: Iterable[Any] = ()) -> list[sqlite3.Row]:
     return conn.execute(sql, tuple(params)).fetchall()
+
+
+# Columns added to existing tables after their first release. CREATE TABLE IF
+# NOT EXISTS does nothing for a table that is already there, so each one is
+# added here when missing. (table, column, declaration)
+_ADDED_COLUMNS = (
+    ("segmentation_morphometry", "figures_json", "TEXT"),
+)
+
+
+def _migrate_add_columns(conn: sqlite3.Connection) -> None:
+    for table, column, decl in _ADDED_COLUMNS:
+        exists = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                              (table,)).fetchone()
+        if not exists:
+            continue
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(%s)" % table)}
+        if column not in cols:
+            conn.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, column, decl))
+    conn.commit()
 
 
 def _migrate_ai_report_single_row(conn: sqlite3.Connection) -> None:

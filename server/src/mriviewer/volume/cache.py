@@ -92,6 +92,15 @@ class VolumeCache:
     def thumb_path(self, key: str) -> Path:
         return self.root / "thumb" / key[:2] / (key + ".jpg")
 
+    def fig_dir(self, seg_key: str, algo: str, params_hash: str) -> Path:
+        """Report figures for one morphometry row.
+
+        The directory is named by algorithm version and parameter hash, the
+        same key as the database row, so a changed threshold leaves the old
+        figures unreferenced rather than served against new numbers.
+        """
+        return self.root / "fig" / seg_key[:2] / seg_key / ("%s-%s" % (algo, params_hash))
+
 
 def hash_inputs(*parts: Any) -> str:
     h = hashlib.sha1()

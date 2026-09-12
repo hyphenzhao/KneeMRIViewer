@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS segmentation_morphometry(
   frame_json TEXT,
   metrics_json TEXT,
   qc_json TEXT,
+  figures_json TEXT,          -- manifest of the cached report figures (cache/fig)
   state TEXT DEFAULT 'pending',
   error TEXT,
   duration_ms INTEGER,

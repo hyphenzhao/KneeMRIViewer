@@ -36,6 +36,7 @@ class DenudedPatch:
     # short of the bone label is far lower. Only the former is a lesion.
     enclosure: float
     vertex_index: np.ndarray = field(repr=False)
+    points_lps: np.ndarray | None = field(default=None, repr=False)   # the patch, LPS mm
 
 
 @dataclass
@@ -165,7 +166,8 @@ def bone_coverage(fields: dict[int, np.ndarray], grid, geom, frame, bone: int,
                 code = ""
             patches.append(DenudedPatch(
                 area_mm2=area, centroid_lps=pts.mean(0).tolist(), cart_label=cart,
-                code=code, n_slices=n_sl, enclosure=enclosure, vertex_index=members))
+                code=code, n_slices=n_sl, enclosure=enclosure, vertex_index=members,
+                points_lps=pts))
         # Patches too small to count are not denuded area either.
         keep = np.zeros(len(verts), bool)
         for p in patches:

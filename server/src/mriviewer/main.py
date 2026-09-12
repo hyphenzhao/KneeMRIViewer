@@ -8,6 +8,7 @@ compresses per request and the browser decompresses natively.
 from __future__ import annotations
 
 import json
+import re
 import os
 import sqlite3
 import threading
@@ -427,10 +428,33 @@ def segmentation_morphometry(seg_id: int) -> dict[str, Any]:
     """Stored cartilage morphometry, or a 404 telling the caller to build it."""
     from .morph.service import get_morphometry
     _seg_row(seg_id)
-    stored = get_morphometry(db(), seg_id)
+    stored = get_morphometry(db(), seg_id, cfg())
     if stored is None:
         raise HTTPException(404, "not computed")
     return stored
+
+
+_FIGURE_NAME = re.compile(r"^[a-z0-9_]+\.(json|png)$")
+
+
+@app.get("/api/v1/segmentations/{seg_id}/figures/{name}")
+def segmentation_figure(seg_id: int, name: str) -> FileResponse:
+    """One cached report figure (a plate raster JSON or a key-slice PNG).
+
+    Only names the current morphometry row lists are served, and nothing is
+    computed on a miss: the figures belong to the numbers and are made with
+    them. The URL carries the params hash, so the response is immutable.
+    """
+    from .morph.service import figure_file
+    if not _FIGURE_NAME.match(name):
+        raise HTTPException(404, "no such figure")
+    _seg_row(seg_id)
+    path = figure_file(db(), cfg(), seg_id, name)
+    if path is None:
+        raise HTTPException(404, "figure not available; regenerate the report")
+    media = "image/png" if name.endswith(".png") else "application/json"
+    return FileResponse(path, media_type=media,
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 @app.post("/api/v1/segmentations/{seg_id}/morphometry/build")
