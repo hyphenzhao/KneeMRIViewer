@@ -1,0 +1,54 @@
+# /etc/mriviewer/config.toml
+bind = "0.0.0.0:8080"
+state_dir = "/var/lib/mriviewer"
+labelsets_dir = "/opt/mriviewer/labelsets"
+web_dir = "/opt/mriviewer/web"
+scan_workers = 12
+
+# Volumes larger than this get a downsampled delivery variant built alongside
+# the native one. Knee series are ~14 MB so they never trigger it; a COPD chest
+# CT is ~377 MB and does.
+browser_volume_budget_mb = 150
+
+# Drop <model>/<version>/<series_uid>/<labelset>.nii.gz in here and it shows up
+# in the viewer as another selectable segmentation layer. No code change.
+predictions_roots = ["/var/lib/mriviewer/predictions"]
+
+# Mount the drive by LABEL and read-only (see deploy/README), not via the
+# transient /media/<user>/ automount path - that changes between machines.
+[[datasets]]
+key = "ds0826"
+name = "0826 膝关节软骨标注集"
+adapter = "ds0826"
+root = "/srv/mridata/0826"
+label_set = "knee_cartilage_0826_v1"
+
+[[datasets]]
+key = "changzheng"
+name = "长征医院膝关节 MR"
+adapter = "changzheng"
+root = "/srv/mridata/Knee_MR_Anonymized_CHANGZHENG"
+reports_csv = "reports_deidentified.csv"
+
+[[datasets]]
+key = "fspdw"
+name = "fsPDW"
+adapter = "fspdw"
+root = "/srv/mridata/fsPDW"
+
+[[datasets]]
+key = "copd"
+name = "COPD 胸部 CT"
+adapter = "copd_nifti"
+root = "/srv/mridata/COPD_prognosis/IMAGE"
+label_set = "lung_lobes_v1"
+delivery_profile = "downsample"
+
+[[datasets]]
+key = "bonescan"
+name = "核医学骨扫描"
+adapter = "bonescan"
+root = "/srv/mridata/Bone Scan"
+viewer = "frames_2d"
+# root/<collection>/<batch>/<patient>: patients live 3 levels down.
+patient_depth = 3

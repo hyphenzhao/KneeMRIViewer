@@ -1,0 +1,18 @@
+# 0826 膝关节软骨标注 —— 标签含义由平台从 24 例标注数据反推确认（24/24 全部通过解剖学一致性检验）：
+#   - 4/5 位于关节线之上、上下跨度 ~38mm（包绕股骨髁）；6/7 位于关节线之下、跨度 ~12mm（平坦的平台）
+#   - {4,6} 与 {5,7} 在内外侧方向上各自成对；23/24 例中 {4,6} 靠近中线（内侧）
+#   - 3 在所有 24 例中都位于股骨前方 → 髌骨；8 紧贴 3 之后、厚度仅 ~13mm → 髌骨软骨
+#   - 各软骨平均体积 1.8–6.1 cm³，与文献中膝关节各间室软骨体积范围吻合
+# ⚠ 例外：case 1 的 {4,6}/{5,7} 内外侧与其余 23 例相反，需人工复核（见 README 的「已知数据问题」）
+key: knee_cartilage_0826_v1
+name: 膝关节骨与软骨（0826）
+name_en: Knee bone & cartilage (0826)
+labels:
+  - {value: 1, name: Femur,                     name_zh: 股骨,         color: "#D6C6A5", opacity: 0.45, group: bone}
+  - {value: 2, name: Tibia,                     name_zh: 胫骨,         color: "#B9A97E", opacity: 0.45, group: bone}
+  - {value: 3, name: Patella,                   name_zh: 髌骨,         color: "#E8DCC0", opacity: 0.45, group: bone}
+  - {value: 4, name: Medial femoral cartilage,  name_zh: 股骨内侧软骨, color: "#E6194B", opacity: 0.75, group: cartilage}
+  - {value: 5, name: Lateral femoral cartilage, name_zh: 股骨外侧软骨, color: "#F58231", opacity: 0.75, group: cartilage}
+  - {value: 6, name: Medial tibial cartilage,   name_zh: 胫骨内侧软骨, color: "#3CB44B", opacity: 0.75, group: cartilage}
+  - {value: 7, name: Lateral tibial cartilage,  name_zh: 胫骨外侧软骨, color: "#42D4F4", opacity: 0.75, group: cartilage}
+  - {value: 8, name: Patellar cartilage,        name_zh: 髌骨软骨,     color: "#911EB4", opacity: 0.75, group: cartilage}

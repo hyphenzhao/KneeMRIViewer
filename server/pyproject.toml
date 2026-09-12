@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mriviewer"
+version = "0.1.0"
+description = "LAN-only MRI cartilage segmentation viewer"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[project.scripts]
+mrictl = "mriviewer.cli:main"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.in"] }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mriviewer = ["db/*.sql"]

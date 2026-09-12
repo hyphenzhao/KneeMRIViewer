@@ -1,0 +1,5 @@
+key: lung_lobes_v1
+name: 双肺（COPD merged mask）
+labels:
+  - {value: 1, name: Left lung,  name_zh: 左肺, color: "#4363D8", opacity: 0.5, group: lung}
+  - {value: 2, name: Right lung, name_zh: 右肺, color: "#F032E6", opacity: 0.5, group: lung}

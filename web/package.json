@@ -1,0 +1,36 @@
+{
+  "name": "mri-viewer-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b --noCheck && vite build",
+    "preview": "vite preview",
+    "check": "tsc -b"
+  },
+  "dependencies": {
+    "@cornerstonejs/core": "5.8.2",
+    "@cornerstonejs/metadata": "5.8.2",
+    "@cornerstonejs/tools": "5.8.2",
+    "@cornerstonejs/utils": "5.8.2",
+    "@kitware/vtk.js": "36.4.1",
+    "d3-array": "3.2.4",
+    "d3-interpolate": "3.0.1",
+    "events": "^3.3.0",
+    "gl-matrix": "3.4.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "url": "^0.11.4",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/d3-array": "3.2.1",
+    "@types/d3-interpolate": "3.0.4",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0"
+  }
+}

@@ -1,0 +1,42 @@
+# Build output
+web/node_modules/
+web/dist/
+web/tsconfig.tsbuildinfo
+server/build/
+*.egg-info/
+__pycache__/
+*.py[cod]
+
+# Environments
+venv/
+.venv/
+env/
+
+# Secrets and machine-local configuration.
+# The API key lives in a 0600 file named by config.toml; config.toml itself
+# holds this machine's dataset paths. Neither belongs in version control.
+*.key
+config.toml
+!deploy/config.example.toml
+
+# State: index, caches, derived volumes and meshes
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+cache/
+derived/
+predictions/
+
+# Reference data that is licensed separately and not redistributed here
+# (e.g. CLAIR-Knee-103R, CC BY-NC 4.0).
+refdata/
+
+# Test and tooling artefacts
+.pytest_cache/
+browser-check/
+*.log
+
+# OS noise
+.DS_Store
+._*
+Thumbs.db

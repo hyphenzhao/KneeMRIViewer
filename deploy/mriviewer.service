@@ -1,0 +1,24 @@
+[Unit]
+Description=MRI cartilage viewer
+After=network.target
+# Do not start before the data drive is there, and do not fail forever if it is not.
+RequiresMountsFor=/srv/mridata
+
+[Service]
+Type=simple
+User=mriviewer
+Group=mriviewer
+Environment=MRIVIEWER_CONFIG=/etc/mriviewer/config.toml
+WorkingDirectory=/opt/mriviewer
+ExecStart=/opt/mriviewer/venv/bin/uvicorn mriviewer.main:app \
+  --host 0.0.0.0 --port 8080 --workers 4 --timeout-keep-alive 30 --no-access-log
+Restart=on-failure
+RestartSec=5
+# The source data is never written to; the cache is the only writable path.
+ReadWritePaths=/var/lib/mriviewer
+ProtectSystem=strict
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

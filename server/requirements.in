@@ -1,0 +1,30 @@
+# Runtime dependencies. Pin with:
+#   pip-compile requirements.in -o requirements.lock.txt --generate-hashes
+fastapi
+uvicorn[standard]
+orjson
+pyyaml
+tomli; python_version < "3.11"
+
+numpy
+scipy
+pydicom>=3.0
+nibabel
+SimpleITK
+openpyxl
+Pillow
+
+# Some 0826 series are JPEG Lossless (transfer syntax 1.2.840.10008.1.2.4.70),
+# not the uncompressed Explicit VR LE the rest of the set uses - 2 of the 24
+# annotated cases. Without these, pydicom cannot read their pixel data at all.
+# openjpeg covers the JPEG 2000 syntaxes the Philips/Siemens datasets use.
+pylibjpeg
+pylibjpeg-libjpeg
+pylibjpeg-openjpeg
+
+# VTK is used for the 3D label surfaces (flying edges + windowed-sinc smoothing
+# + decimation). Pin to a version that publishes cp310 manylinux wheels, since
+# the target is Ubuntu 22.04's stock Python 3.10 and there is no compiler on an
+# air-gapped box. Without VTK the mesh pipeline falls back to scikit-image,
+# which works but is visibly rougher.
+vtk>=9.3,<9.4

@@ -1,0 +1,121 @@
+# 膝关节软骨形态学参考值与指标说明
+#
+# 这个文件是给医生改的，不是给程序改的。阈值、参考值、中文措辞都在这里，
+# 改完保存即可生效（按 mtime 热加载），不需要重新部署。
+#
+# ⚠ 关于 applicability 字段，请务必先读：
+#   direct         —— 参考队列的采集方式与本平台一致，可直接比较
+#   indirect       —— 参考队列用的是别的序列/层厚，只能当作「量级参照」
+#   expert_opinion —— 没有队列数据，仅为经验值
+#
+# 本文件中 **所有** Framingham 参考值都是 indirect。原因见下面的 measurement_caveat：
+# 该队列用的是近各向同性 FLASH，而本平台数据是 3 mm 层厚的 2D PD-FSE，
+# 体模实测本平台会系统性低估 7-18%。因此 Z 分数**不可**作为诊断依据。
+
+key: knee_cartilage_reference_v1
+version: 1
+updated: "2026-09-11"
+
+measurement_caveat:
+  zh: >-
+    本平台数据为矢状位 2D 采集、层厚 3 mm（各向异性约 10:1）。体模实测表明：
+    测量算法本身在各向同性数据上无偏（误差 +0.001 mm），但在本采集条件下，
+    即使在「可靠区」软骨厚度仍被系统性低估约 7-18%，且偏差随真实厚度非单调变化
+    （1.0 mm 时 -0.14 mm，2.0 mm 时 -0.35 mm，3.0 mm 时 +0.23 mm），
+    无法用固定系数校正。
+  implications_zh:
+    - 绝对厚度（mm）不可直接与文献参考值比较，Z 分数仅供参考，不作诊断依据。
+    - 同一膝关节内的**内外侧对比**更可靠——偏差在两个间室间大体抵消。
+    - 同一患者、同一协议的**纵向随访对比**可靠。
+    - 厚度的**空间分布**（哪里最薄）可靠，可用于定位。
+
+# 判定「该顶点的测量是否可信」的阈值。
+thresholds:
+  reliable_resolution_mm: 0.6      # 法线方向上原始数据的有效采样间隔
+  min_slices_for_confidence: 3     # 亚区至少要跨这么多原始层
+  min_reliable_area_fraction: 0.35
+  ray_nn_ratio_range: [0.85, 1.15] # 法线投射 vs 最近邻两种测厚的一致性
+
+metrics:
+  meanThicknessMm:
+    label_zh: 平均软骨厚度
+    unit: mm
+    direction: higher_is_better
+    explanation_zh: >-
+      沿骨-软骨界面法线投射测得的厚度，按顶点面积加权平均（OARSI 的 ThC.cAB 口径，
+      即只在**有软骨覆盖**的骨面上平均）。软骨变薄是骨关节炎最主要的形态学表现。
+  volumeMm3:
+    label_zh: 软骨体积
+    unit: mm³
+    direction: higher_is_better
+    explanation_zh: >-
+      体素计数体积（OARSI 的 VC）。这是本平台最稳健的指标之一——不依赖表面重建，
+      但受分割边界影响，且**不可**与其他研究的绝对值直接比较。
+  interfaceAreaMm2:
+    label_zh: 骨-软骨界面面积
+    unit: mm²
+    direction: neutral
+    explanation_zh: >-
+      有软骨覆盖的软骨下骨面积（cAB）。绝对值依赖水平集插值，仅建议看比值与变化趋势。
+  asymmetryPct:
+    label_zh: 内外侧不对称度
+    unit: "%"
+    direction: closer_to_zero_is_better
+    explanation_zh: >-
+      (内侧 − 外侧) ÷ 平均值。**本平台在各向异性数据上最可信的定量指标**：
+      层厚导致的系统性低估在内外侧间大体抵消。内侧明显偏薄提示内侧间室退变，
+      与膝内翻、内侧半月板病变相关。健康膝通常在 ±10% 以内。
+  effectiveResolutionMm:
+    label_zh: 有效分辨率
+    unit: mm
+    direction: lower_is_better
+    explanation_zh: >-
+      在测厚方向（表面法线）上，**原始数据**的采样间隔。法线落在矢状面内时约 0.3 mm，
+      指向内外侧时等于层厚 3 mm。这是判断某个区域能不能信的关键数字。
+
+# Framingham KL0（无放射学股胫 OA）686 例，ThCtAB 口径，分性别 mean ± SD。
+# 来源：PMC2982217 Table II。
+# ⚠ 全部标记 indirect：该队列用近各向同性 FLASH，与本平台 3 mm PD-FSE 不等价。
+reference_source:
+  name: Framingham Osteoarthritis Study (KL0 subset)
+  n: 686
+  sequence: "近各向同性 FLASH / DESS"
+  measure: ThCtAB
+  citation: "https://pmc.ncbi.nlm.nih.gov/articles/PMC2982217/"
+  applicability: indirect
+  applicability_note_zh: >-
+    与本平台采集方式不同（层厚与序列均不同），参考带在图上以斜纹绘制，
+    表示「量级参照」而非「诊断阈值」。
+
+subregions:
+  ccMF: {label_zh: 股骨内侧髁中央-中央带, male: [2.54, 0.44], female: [2.05, 0.37]}
+  ecMF: {label_zh: 股骨内侧髁中央-外侧带, male: [1.51, 0.25], female: [1.26, 0.20]}
+  icMF: {label_zh: 股骨内侧髁中央-内侧带, male: [2.19, 0.30], female: [1.83, 0.27]}
+  ccLF: {label_zh: 股骨外侧髁中央-中央带, male: [2.30, 0.36], female: [1.97, 0.34]}
+  ecLF: {label_zh: 股骨外侧髁中央-外侧带, male: [1.70, 0.24], female: [1.46, 0.22]}
+  icLF: {label_zh: 股骨外侧髁中央-内侧带, male: [1.83, 0.23], female: [1.55, 0.21]}
+  cMT:  {label_zh: 胫骨内侧平台中央,     male: [2.54, 0.39], female: [2.17, 0.31]}
+  eMT:  {label_zh: 胫骨内侧平台外缘,     male: [1.59, 0.22], female: [1.36, 0.18]}
+  iMT:  {label_zh: 胫骨内侧平台内缘,     male: [2.01, 0.27], female: [1.77, 0.22]}
+  aMT:  {label_zh: 胫骨内侧平台前部,     male: [1.73, 0.21], female: [1.46, 0.19]}
+  pMT:  {label_zh: 胫骨内侧平台后部,     male: [1.54, 0.22], female: [1.43, 0.17]}
+  cLT:  {label_zh: 胫骨外侧平台中央,     male: [3.44, 0.53], female: [2.87, 0.51]}
+  eLT:  {label_zh: 胫骨外侧平台外缘,     male: [1.71, 0.22], female: [1.47, 0.21]}
+  iLT:  {label_zh: 胫骨外侧平台内缘,     male: [2.19, 0.28], female: [1.89, 0.27]}
+  aLT:  {label_zh: 胫骨外侧平台前部,     male: [1.87, 0.26], female: [1.62, 0.21]}
+  pLT:  {label_zh: 胫骨外侧平台后部,     male: [2.13, 0.32], female: [1.98, 0.31]}
+  # 以下亚区本平台会输出，但 Framingham 未单列参考值，图上不画参考带。
+  MFT: {label_zh: 股骨内侧滑车}
+  LFT: {label_zh: 股骨外侧滑车}
+  pMF: {label_zh: 股骨内侧髁后部}
+  pLF: {label_zh: 股骨外侧髁后部}
+  MP:  {label_zh: 髌骨内侧面}
+  LP:  {label_zh: 髌骨外侧面}
+
+# 本平台在 23 例标注数据上与 Framingham 的实测偏差，用于解释图上的偏移。
+# 不是「校正系数」——记录在此是为了让读图的人知道哪些差异是已知的。
+observed_deviation_note_zh: >-
+  在本院 23 例标注数据上，胫骨各亚区与 Framingham 吻合较好（cMT −0%、iLT −4%、
+  pMT −6%、cLT/aLT −8%、aMT −9%）；股骨髁中央带系统性偏薄 18-23%，方向与上述
+  层厚导致的低估一致；而 eMT（+31%）、eLT（+16%）偏厚，原因尚未确定，
+  可能与亚区边界定义有关，待医生复核后细化。
