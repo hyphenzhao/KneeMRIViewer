@@ -128,6 +128,9 @@ export function gradeTable(c: RenderedChapter, editing: boolean, onOverride: Ove
   const eff = (g: RenderedChapter['grades'][number]) => g.gradeEffective ?? g.grade ?? ''
   const shown = compact && !editing ? c.grades.filter((g) => eff(g) !== '0') : c.grades
   const zeros = c.grades.length - shown.length
+  // Nothing graded: the map already says so; a headed table with one note
+  // row would only look like data that failed to arrive.
+  if (compact && !editing && !shown.length) return null
   const cols = 3 + (editing ? 1 : 0)
   const rows = shown.map((g) => {
     const conf = CONF[(g.confidence ?? 'low') as keyof typeof CONF] ?? CONF.low
@@ -151,10 +154,10 @@ export function gradeTable(c: RenderedChapter, editing: boolean, onOverride: Ove
       </tr>
     )
   })
-  if (compact && !editing) {
+  if (compact && !editing && zeros > 0) {
     rows.push(
       <tr key="__zeros" className="rp-row-note">
-        <td colSpan={cols}>{shown.length ? `其余 ${zeros} 个亚区为 0 级（无局灶变薄）。` : `全部 ${c.grades.length} 个亚区均为 0 级（无局灶变薄）。`}</td>
+        <td colSpan={cols}>其余 {zeros} 个亚区为 0 级（无局灶变薄）。</td>
       </tr>,
     )
   }

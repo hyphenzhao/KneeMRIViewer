@@ -407,7 +407,12 @@ function buildBlocks(a: BuildArgs): Block[] {
 
     if (c.id === 'cartilage' && c.status === 'ok') {
       cartilageFigures(a, c, plates, comp, sex, out)
-      table('cartilage.grades', c.id, gradeTable(c, editing, override, revoke, true))
+      const spec = gradeTable(c, editing, override, revoke, true)
+      if (spec) table('cartilage.grades', c.id, spec)
+      else if (c.grades.length) {
+        atomic('cartilage.grades.none', c.id,
+          <p className="rp-note">Outerbridge：全部 {c.grades.length} 个亚区均为 0 级（无局灶变薄）；逐亚区分级见图 3 与附录。</p>)
+      }
     } else if (c.grades.length) {
       table(`${c.id}.grades`, c.id, gradeTable(c, editing, override, revoke, false))
     }
