@@ -18,7 +18,6 @@ import os
 import shutil
 import threading
 from contextlib import contextmanager
-from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +25,18 @@ PDF_TIMEOUT_S = 90
 _THREAD_LOCK = threading.Lock()
 
 CJK_FONT_STACK = '"Noto Sans CJK SC","Source Han Sans SC","AR PL UMing CN","WenQuanYi Micro Hei",sans-serif'
+
+# The report renders its own 3D snapshot with WebGL; headless Chromium needs
+# software GL to be told it is allowed to be slow.
+_GL_ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
+            "--ignore-gpu-blocklist"]
+
+
+def _launch_args(cfg: Any) -> list[str]:
+    args = list(_GL_ARGS)
+    if getattr(cfg.pdf, "no_sandbox", False):
+        args.append("--no-sandbox")
+    return args
 
 
 def pdf_available(cfg: Any) -> dict[str, Any]:
@@ -47,9 +58,8 @@ def pdf_available(cfg: Any) -> dict[str, Any]:
     # the full Chromium path whether or not either one is installed.
     try:
         from playwright.sync_api import sync_playwright
-        args = ["--no-sandbox"] if getattr(cfg.pdf, "no_sandbox", False) else []
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, args=args)
+            browser = p.chromium.launch(headless=True, args=_launch_args(cfg))
             out["chromium"] = browser.version
             browser.close()
     except Exception as exc:                      # noqa: BLE001
@@ -94,29 +104,15 @@ def _file_lock(path: Path):
         fh.close()
 
 
-def _header_html(meta: dict[str, Any]) -> str:
-    parts = [meta.get("titleZh") or "膝关节 MRI 结构化报告"]
-    for k in ("lateralityZh", "sexZh", "ageBand"):
-        if meta.get(k):
-            parts.append(str(meta[k]))
-    if meta.get("caseLabel"):
-        parts.append("病例 %s" % meta["caseLabel"])
-    if meta.get("generatedAt"):
-        parts.append(str(meta["generatedAt"])[:10])
-    text = " · ".join(escape(str(x)) for x in parts)
-    return ('<div style="width:100%%;font-size:9px;color:#666;padding:0 14mm;'
-            'font-family:%s;display:flex;justify-content:space-between">'
-            '<span>%s</span><span>第 <span class="pageNumber"></span> / '
-            '<span class="totalPages"></span> 页</span></div>' % (CJK_FONT_STACK, text))
+def render_report_pdf(cfg: Any, seg_id: int) -> bytes:
+    """Render ``#/report/<seg_id>?view=print&pdf=1`` to A4 PDF bytes.
 
-
-def _footer_html(disclaimer: str) -> str:
-    return ('<div style="width:100%%;font-size:8px;color:#777;padding:0 14mm;'
-            'font-family:%s">%s</div>' % (CJK_FONT_STACK, escape(disclaimer or "")))
-
-
-def render_report_pdf(cfg: Any, seg_id: int, meta: dict[str, Any], disclaimer: str) -> bytes:
-    """Render ``#/report/<seg_id>?view=print&pdf=1`` to A4 PDF bytes."""
+    The page lays itself out on explicit A4 sheets with their own header and
+    footer, so Chromium prints with zero margins and no header/footer of its
+    own - otherwise the two would stack. Readiness is the page's word
+    (``data-report-ready``), which it gives only once every figure, including
+    the WebGL snapshot, is drawn and the sheets are paginated.
+    """
     from playwright.sync_api import sync_playwright
 
     browsers = getattr(cfg.pdf, "browsers_path", None)
@@ -125,23 +121,22 @@ def render_report_pdf(cfg: Any, seg_id: int, meta: dict[str, Any], disclaimer: s
     base = getattr(cfg.pdf, "base_url", None) or "http://127.0.0.1:%d" % cfg.bind_port
     url = "%s/#/report/%d?view=print&pdf=1" % (base.rstrip("/"), seg_id)
     timeout_ms = int(getattr(cfg.pdf, "timeout_s", PDF_TIMEOUT_S) * 1000)
-    args = ["--no-sandbox"] if getattr(cfg.pdf, "no_sandbox", False) else []
 
     with _THREAD_LOCK, _file_lock(Path(cfg.state_dir) / "pdf.lock"):
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, args=args)
+            browser = p.chromium.launch(headless=True, args=_launch_args(cfg))
             try:
                 ctx = browser.new_context(locale="zh-CN", viewport={"width": 1000, "height": 1400})
                 page = ctx.new_page()
                 page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+                page.wait_for_function("document.fonts ? document.fonts.status === 'loaded' : true",
+                                       timeout=timeout_ms)
                 page.wait_for_selector("[data-report-ready='1']", timeout=timeout_ms)
                 page.emulate_media(media="print")
                 pdf = page.pdf(
                     format="A4", print_background=True, prefer_css_page_size=True,
-                    display_header_footer=True,
-                    margin={"top": "18mm", "bottom": "18mm", "left": "14mm", "right": "14mm"},
-                    header_template=_header_html(meta),
-                    footer_template=_footer_html(disclaimer),
+                    display_header_footer=False,
+                    margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
                 )
             finally:
                 browser.close()
@@ -165,9 +160,8 @@ def selftest_pdf(cfg: Any, out_dir: Path) -> dict[str, Any]:
             '<h2>PDF 自检：膝关节 MRI 结构化报告</h2>'
             '<p>软骨厚度 2.22 mm，内外侧不对称度 −12.8%%，Outerbridge II 级。</p>'
             '<p>如果这段中文显示为方块，说明缺少 CJK 字体。</p></body></html>' % CJK_FONT_STACK)
-    args = ["--no-sandbox"] if getattr(cfg.pdf, "no_sandbox", False) else []
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=args)
+        browser = p.chromium.launch(headless=True, args=_launch_args(cfg))
         try:
             page = browser.new_page()
             page.set_content(html)

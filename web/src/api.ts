@@ -202,6 +202,21 @@ export interface CompartmentMetric {
   volumeMm3: number
 }
 
+/** What the server drew at morphometry time; see morph/figures.py. */
+export interface FigureManifest {
+  version: number | null
+  algoVersion?: string
+  paramsHash?: string
+  plates: Record<string, { name: string; url: string; bytes: number; kind: string
+    width: number; height: number; pxMm: number }>
+  slices: Record<string, { name: string; url: string; axis: number; index: number; why: string
+    widthPx: number; heightPx: number; mmPerPx: number; labels: number[]; nativeSliceMm?: number }>
+  scale?: { minMm: number; maxMm: number }
+  files: Record<string, number>
+  notes?: string[]
+  error: string | null
+}
+
 export interface Morphometry {
   id: number
   segmentationId: number
@@ -209,10 +224,16 @@ export interface Morphometry {
   paramsHash: string
   params: Record<string, unknown>
   frame: {
+    e_ML: [number, number, number]
+    e_AP: [number, number, number]
+    e_SI: [number, number, number]
+    medial_sign: number
     laterality: string
+    header_laterality: string | null
     medial_lateral_consistent: boolean
     notes: string[]
   } | null
+  figures?: FigureManifest | null
   metrics: {
     plates: PlateMetric[]
     compartments: Record<string, CompartmentMetric | number> & {
@@ -366,6 +387,7 @@ export interface RenderedChapter {
 export interface ReportDocument {
   id: number
   segmentationId: number
+  morphometryId?: number | null
   generation: number
   status: 'ok' | 'partial' | 'failed'
   error: string | null
@@ -434,6 +456,9 @@ export const api = {
     json<{ segmentationId: number; state: string; meshes: MeshEntry[] }>(
       `/segmentations/${id}/meshes`,
     ),
+  /** The segmentation row, with its label set (colours) when it has one. */
+  segmentation: (id: number) =>
+    json<{ id: number; labelSet?: LabelSet | null } & Record<string, unknown>>(`/segmentations/${id}`),
   morphometry: (id: number) => json<Morphometry>(`/segmentations/${id}/morphometry`),
   buildMorphometry: (id: number, force = false) =>
     json<Morphometry>(

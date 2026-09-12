@@ -788,8 +788,7 @@ def report_pdf(seg_id: int) -> Response:
     if not avail["available"]:
         raise HTTPException(503, avail["detail"] or "PDF 渲染不可用")
     try:
-        pdf = render_report_pdf(cfg(), seg_id, doc.get("header") or {},
-                                (doc.get("header") or {}).get("disclaimerZh") or "")
+        pdf = render_report_pdf(cfg(), seg_id)
     except Exception as exc:                     # noqa: BLE001
         raise HTTPException(500, "PDF 渲染失败：%s" % str(exc)[:300]) from exc
     return Response(pdf, media_type="application/pdf", headers={

@@ -245,93 +245,6 @@ label.chk { display: flex; align-items: center; gap: 5px; color: var(--muted); f
 }
 .viewwrap .progress .lbl { text-align: center; }
 
-/* ---------------------------------------------- 指标看板 #/metrics/<id> */
-/* The viewer locks scrolling for the four-up grid; the dashboard is a normal
-   document and has to opt back in. */
-body:has(.mx-root) { overflow: auto; }
-
-.mx-root { min-height: 100%; background: var(--bg); }
-
-.mx-head {
-  position: sticky; top: 0; z-index: 5;
-  display: flex; align-items: center; gap: 16px;
-  padding: 10px 20px; background: var(--panel);
-  border-bottom: 1px solid var(--line);
-}
-.mx-head h1 { font-size: 15px; margin: 0; font-weight: 600; }
-.mx-back { color: var(--accent); text-decoration: none; }
-.mx-back:hover { text-decoration: underline; }
-.mx-disclaim {
-  margin-left: auto; color: #f0c674; font-size: 12px;
-  border: 1px solid #6b5a20; border-radius: 4px; padding: 2px 8px;
-}
-
-.mx-main { max-width: 1180px; margin: 0 auto; padding: 16px 20px 48px; }
-
-.mx-card {
-  background: var(--panel); border: 1px solid var(--line);
-  border-radius: 8px; padding: 16px 18px; margin-bottom: 16px;
-}
-.mx-card h2 { font-size: 14px; margin: 0 0 6px; font-weight: 600; }
-.mx-sub { color: var(--muted); font-size: 12px; margin: 0 0 12px; line-height: 1.6; }
-.mx-note { color: var(--muted); font-size: 12px; line-height: 1.6; }
-.mx-kv { color: var(--muted); margin-right: 6px; }
-
-.mx-banner {
-  display: flex; gap: 28px; align-items: center; flex-wrap: wrap;
-  background: var(--panel-2); border: 1px solid var(--line);
-  border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; font-size: 12px;
-}
-.mx-sex { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-
-.mx-qc .mx-caveat {
-  background: var(--panel-2); border-left: 3px solid #ec835a;
-  padding: 10px 12px; margin: 0 0 10px; font-size: 12px; line-height: 1.7;
-}
-.mx-implications { margin: 0 0 14px; padding-left: 20px; color: var(--muted); font-size: 12px; line-height: 1.8; }
-.mx-qc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-.mx-stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
-.mx-stat-v { font-size: 20px; font-weight: 600; }
-.mx-stat-l { color: var(--muted); font-size: 11px; margin-top: 2px; }
-.mx-conf-row { display: flex; align-items: center; gap: 14px; margin-top: 12px; font-size: 12px; }
-.mx-badge { white-space: nowrap; }
-
-.mx-comp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.mx-comp { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
-.mx-comp h3 { font-size: 13px; margin: 0 0 8px; font-weight: 600; }
-.mx-comp dl { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; font-size: 12px; }
-.mx-comp dt { color: var(--muted); }
-.mx-comp dd { margin: 0; font-variant-numeric: tabular-nums; }
-.mx-hero-n { font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 4px 0 8px; }
-
-.mx-key { display: flex; gap: 18px; align-items: center; font-size: 11px; color: var(--muted); margin-bottom: 6px; flex-wrap: wrap; }
-.mx-key i { display: inline-block; vertical-align: middle; margin-right: 5px; }
-.mx-key-dot { width: 9px; height: 9px; border-radius: 50%; }
-.mx-key-band { width: 26px; height: 10px; border-radius: 2px; background: repeating-linear-gradient(45deg, rgba(139,151,168,.5) 0 1.6px, rgba(139,151,168,.14) 1.6px 6px); }
-.mx-key-muted { margin-left: auto; }
-
-.mx-scroll { overflow-x: auto; }
-.mx-explain { margin-top: 12px; font-size: 12px; color: var(--muted); }
-.mx-explain summary { cursor: pointer; color: var(--accent); }
-.mx-explain p { line-height: 1.7; }
-
-.mx-hist-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
-.mx-hist { margin: 0; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 10px; }
-.mx-hist figcaption { font-size: 12px; margin-bottom: 4px; }
-.mx-hist-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
-
-.mx-gloss > div { margin-bottom: 10px; }
-.mx-gloss dt { font-size: 12px; font-weight: 600; }
-.mx-gloss dd { margin: 2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
-
-.mx-table { border-collapse: collapse; font-size: 12px; width: 100%; }
-.mx-table th, .mx-table td { border-bottom: 1px solid var(--line); padding: 5px 9px; text-align: left; white-space: nowrap; }
-.mx-table th { color: var(--muted); font-weight: 500; position: sticky; top: 0; background: var(--panel); }
-.mx-mono { font-variant-numeric: tabular-nums; }
-
-.mx-fail { background: var(--panel); border: 1px solid #6b3a2a; border-radius: 8px; padding: 20px; }
-.mx-fail h2 { margin: 0 0 8px; font-size: 14px; color: #ec835a; }
-
 /* ---------------------------------------- 侧栏诊断报告（在分割标签下方） */
 /* Reuses .section-title and dl.report from the radiologist report block above,
    so the two read as the same kind of object. Only the chrome is new. */
@@ -394,50 +307,45 @@ body:has(.mx-root) { overflow: auto; }
 .fld-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fld-inline > span { color: var(--text); }
 .fld-inline > i { flex-basis: 100%; }
-.mx-raw { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; margin-top: 10px; }
-
-/* -------------------------------------------------- 诊断报告正文 */
-.mx-report-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
-.mx-report-head h2 { margin: 0; }
-.mx-sections { display: grid; gap: 12px; margin-top: 12px; }
-.mx-section { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
-.mx-section h3 { font-size: 12px; margin: 0 0 6px; color: var(--accent); font-weight: 600; letter-spacing: .04em; }
-.mx-section p { margin: 0 0 6px; font-size: 13px; line-height: 1.9; }
-.mx-section p:last-child { margin-bottom: 0; }
-.mx-disclaim-block {
-  margin: 12px 0 0; padding: 8px 12px; font-size: 12px; color: #f0c674;
-  background: rgba(240,198,116,.07); border-left: 3px solid #6b5a20; border-radius: 3px;
-}
-.mx-guard { background: rgba(236,131,90,.08); border-left: 3px solid #ec835a; padding: 10px 12px; margin: 10px 0; font-size: 12px; border-radius: 3px; }
-.mx-warn { color: #ec835a; font-size: 12px; }
-.mx-review { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; font-size: 12px; }
-.mx-review input {
-  font: inherit; color: var(--text); background: var(--panel-2);
-  border: 1px solid var(--line); border-radius: 5px; padding: 4px 8px; width: 150px;
-}
-.mx-payload {
-  max-height: 320px; overflow: auto; background: var(--bg); border: 1px solid var(--line);
-  border-radius: 5px; padding: 10px; font-size: 11px; line-height: 1.5;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--muted);
-}
-
 
 /* ------------------------------------------------ 侧栏：膝关节报告卡 */
 .sr-state .sr-row dd { font-size: 12px; }
 .sr-warn { color: #ec835a; }
 
 /* ---------------------------------------- 结构化报告页 #/report/<id> */
-/* Three views of one rendered document. All colours go through the tokens
-   below so the print view can flip them in one place. */
+/* One illustrated document on explicit A4 sheets. Every colour goes through
+   the --rp-* tokens: the dark screen palette is defined here, the print view
+   (and print media) flips the tokens and nothing else - so what is measured
+   on screen is what prints. */
 body:has(.rp-root) { overflow: auto; }
+.mx-back { color: var(--accent); text-decoration: none; }
+.mx-back:hover { text-decoration: underline; }
+
 .rp-root {
   min-height: 100%;
-  --rp-bg: var(--bg); --rp-paper: var(--panel); --rp-paper-2: var(--panel-2);
-  --rp-line: var(--line); --rp-text: var(--text); --rp-muted: var(--muted);
-  --rp-accent: var(--accent);
+  --rp-bg: #0d1117; --rp-paper: #161b22; --rp-paper-2: #1c2430;
+  --rp-line: #2a3341; --rp-text: #d8e0ea; --rp-muted: #8b97a8; --rp-accent: #4da3ff;
+  --rp-chart-value: #3987e5; --rp-chart-band: #8b97a8; --rp-chart-grid: #2a3341; --rp-chart-mean: #d8e0ea;
+  --rp-good: #56d364; --rp-warn: #e3b341; --rp-bad: #ec835a;
+  --rp-conf-high: #56d364; --rp-conf-medium: #e3b341; --rp-conf-low: #ec835a;
+  --rp-grade-0: #6b7280; --rp-grade-2: #f5c542; --rp-grade-3: #f08a24; --rp-grade-4: #d7263d; --rp-grade-na: #2a3341;
+  --rp-lesion-ii: #ffd166; --rp-lesion-iii: #ff9f1c; --rp-lesion-iv: #ff4d6d;
+  --rp-map-unmeasured: #4b5563;
   background: var(--rp-bg); color: var(--rp-text);
   font-family: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
 }
+.rp-root[data-view="print"] {
+  --rp-bg: #e5e7eb; --rp-paper: #ffffff; --rp-paper-2: #f3f4f6; --rp-line: #c9ced6;
+  --rp-text: #111111; --rp-muted: #4b5563; --rp-accent: #1f4b7a;
+  --rp-chart-value: #1f5fbf; --rp-chart-band: #6b7280; --rp-chart-grid: #d1d5db; --rp-chart-mean: #111111;
+  --rp-good: #15803d; --rp-warn: #b45309; --rp-bad: #b91c1c;
+  --rp-conf-high: #15803d; --rp-conf-medium: #b45309; --rp-conf-low: #b91c1c;
+  --rp-grade-0: #c4cad2; --rp-grade-2: #f2c14e; --rp-grade-3: #ee7f1a; --rp-grade-4: #c8102e; --rp-grade-na: #ffffff;
+  --rp-lesion-ii: #b8860b; --rp-lesion-iii: #d35400; --rp-lesion-iv: #b00020;
+  --rp-map-unmeasured: #d1d5db;
+  color-scheme: light;
+}
+
 .rp-toolbar {
   position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px;
   padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
@@ -447,78 +355,209 @@ body:has(.rp-root) { overflow: auto; }
 .rp-views { display: flex; gap: 2px; }
 .rp-views button.active { background: var(--accent-dim); border-color: var(--accent); }
 .rp-editor { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 4px 8px; width: 210px; }
-.rp-link { color: var(--accent); text-decoration: none; font-size: 12px; }
-
-.rp-page { max-width: 900px; margin: 0 auto; padding: 18px 24px 60px; }
-.rp-head { border-bottom: 2px solid var(--rp-text); padding-bottom: 10px; margin-bottom: 14px; }
-.rp-title { font-size: 20px; font-weight: 700; text-align: center; letter-spacing: .1em; margin-bottom: 10px; }
-.rp-meta { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 4px 12px; margin: 0; font-size: 12px; }
-.rp-meta dt { color: var(--rp-muted); }
-.rp-meta dd { margin: 0; }
-
-.rp-section { font-size: 15px; margin: 18px 0 8px; padding-left: 8px; border-left: 4px solid var(--rp-accent); }
-.rp-chapter { margin: 0 0 14px; }                 /* may break: a long chapter must not push a whole page blank */
-.rp-chapter h3 { font-size: 13.5px; margin: 10px 0 6px; display: flex; align-items: center; gap: 8px; break-after: avoid; }
-.rp-badge { font-size: 10.5px; font-weight: 400; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--rp-line); color: var(--rp-muted); }
-.rp-badge-pending { border-style: dashed; }
-.rp-badge-failed { color: #ec835a; border-color: #ec835a; }
-.rp-prose p { margin: 0 0 6px; font-size: 13px; line-height: 1.9; }
-.rp-placeholder { color: var(--rp-muted); font-size: 12.5px; margin: 4px 0; padding: 6px 10px; border: 1px dashed var(--rp-line); border-radius: 4px; }
-.rp-failed { color: #ec835a; border-color: #ec835a; }
-.rp-subitems { margin: 4px 0 0 18px; padding: 0; font-size: 12px; color: var(--rp-muted); line-height: 1.8; }
-.rp-radiologist { margin: 8px 0 0; padding: 8px 10px; background: var(--rp-paper-2); border-left: 3px solid var(--rp-muted); border-radius: 3px; font-size: 12.5px; line-height: 1.8; }
-.rp-radiologist p { margin: 0; }
-.rp-radiologist-label { font-weight: 600; font-size: 11.5px; color: var(--rp-muted); margin-bottom: 2px; }
-.rp-note { color: var(--rp-muted); font-size: 11px; margin-top: 2px; }
-.rp-caveats { margin: 6px 0 0; padding-left: 18px; color: var(--rp-muted); font-size: 11.5px; line-height: 1.7; }
-.rp-items { margin: 0; padding-left: 22px; font-size: 13px; line-height: 1.9; }
-.rp-origin { color: var(--rp-muted); font-size: 11.5px; }
-.rp-table { border-collapse: collapse; font-size: 12px; width: 100%; margin: 6px 0 4px; }
-.rp-table thead { display: table-header-group; }   /* header repeats on each printed page */
-.rp-table th, .rp-table td { border-bottom: 1px solid var(--rp-line); padding: 4px 8px; text-align: left; vertical-align: top; }
-.rp-table th { color: var(--rp-muted); font-weight: 500; }
-.rp-table tr { break-inside: avoid; }
-.rp-num { font-variant-numeric: tabular-nums; }
-.rp-mark { display: inline-block; margin-left: 6px; font-size: 11px; color: #d97706; border-bottom: 1px dotted #d97706; }
-.rp-mark-cell { margin-top: 2px; }
-.rp-guard { margin: 8px 0; padding: 8px 10px; font-size: 12px; background: rgba(236,131,90,.08); border-left: 3px solid #ec835a; border-radius: 3px; }
-.rp-sign { margin: 22px 0 8px; font-size: 12px; color: var(--rp-muted); display: grid; gap: 6px; }
-.rp-appendix { break-before: page; margin-top: 24px; }
-.rp-foot { margin-top: 24px; padding-top: 8px; border-top: 1px solid var(--rp-line); font-size: 11px; color: var(--rp-muted); }
-.rp-mini { font-size: 11px; padding: 1px 6px; margin-left: 6px; }
-.rp-edit { width: 100%; font: inherit; font-size: 13px; line-height: 1.7; color: var(--rp-text); background: var(--rp-paper-2); border: 1px solid var(--rp-accent); border-radius: 4px; padding: 6px 8px; }
-.rp-edit-inline { width: 90%; font: inherit; font-size: 13px; color: var(--rp-text); background: var(--rp-paper-2); border: 1px solid var(--rp-accent); border-radius: 4px; padding: 2px 6px; }
-.rp-edit-num { width: 80px; font: inherit; font-size: 12px; color: var(--rp-text); background: var(--rp-paper-2); border: 1px solid var(--rp-accent); border-radius: 4px; padding: 2px 6px; }
-
-/* Print view: a white A4 column. Only the tokens change; every rule above
-   reads them. Pagination itself happens in Chromium's print engine. */
-.rp-root[data-view="print"] {
-  --rp-bg: #e5e7eb; --rp-paper: #fff; --rp-paper-2: #f3f4f6; --rp-line: #c9ced6;
-  --rp-text: #111; --rp-muted: #4b5563; --rp-accent: #1f4b7a;
-  color-scheme: light;
-}
-.rp-root[data-view="print"] .rp-page {
-  background: #fff; color: #111; width: 210mm; max-width: 100%; box-sizing: border-box;
-  padding: 16mm 14mm 18mm; margin: 16px auto; box-shadow: 0 2px 16px rgba(0,0,0,.25);
-}
-.rp-root[data-view="print"] .rp-guard { background: #fff4ee; }
-.rp-root[data-view="print"] .rp-mark { color: #b45309; border-color: #b45309; }
-
-@page { size: A4; margin: 16mm 14mm 18mm; }
-@media print {
-  body, .rp-root { background: #fff !important; color: #111 !important; }
-  .rp-root {
-    --rp-bg: #fff; --rp-paper: #fff; --rp-paper-2: #f3f4f6; --rp-line: #c9ced6;
-    --rp-text: #111; --rp-muted: #4b5563; --rp-accent: #1f4b7a;
-  }
-  .rp-toolbar { display: none !important; }
-  .rp-page { width: auto; max-width: none; margin: 0; padding: 0; box-shadow: none; }
-  figure, .rp-prose p, .rp-placeholder, .rp-radiologist, .rp-sign, .rp-item { break-inside: avoid; }
-  h2, h3, .rp-section { break-after: avoid; }
-  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-}
 .rp-btn { display: inline-block; font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 4px 10px; text-decoration: none; }
 .rp-btn:hover { border-color: var(--accent); }
+
+/* ---- sheets ---- */
+.rp-page { padding: 16px 0 60px; margin: 0 auto; }
+.rp-page > .loading, .rp-page > .err { max-width: 210mm; margin-left: auto; margin-right: auto; }
+.rp-sheets { display: flex; flex-direction: column; align-items: center; gap: 8mm; }
+.rp-sheet {
+  position: relative; width: 210mm; min-height: 297mm; box-sizing: border-box; padding: 16mm 14mm 18mm;
+  background: var(--rp-paper); color: var(--rp-text); border: 1px solid var(--rp-line); flex: none;
+}
+.rp-sheet-head, .rp-sheet-foot {
+  position: absolute; left: 14mm; right: 14mm; display: flex; justify-content: space-between; gap: 8mm;
+  color: var(--rp-muted); line-height: 1.3;
+}
+.rp-sheet-head { top: 5mm; font-size: 9px; border-bottom: 1px solid var(--rp-line); padding-bottom: 1mm; }
+.rp-sheet-foot { bottom: 6mm; font-size: 8px; }
+.rp-sheet-foot span:first-child { flex: 1; }
+.rp-sheet-body { width: 182mm; }
+.rp-root[data-view="print"] .rp-page { width: 210mm; padding: 0; margin: 16px auto; background: #ffffff; }
+.rp-root[data-view="print"] .rp-sheet { height: 297mm; overflow: hidden; border: none; box-shadow: 0 2px 16px rgba(0,0,0,.25); }
+.rp-sheet[data-overflow="1"] { outline: 2px dashed var(--rp-bad); outline-offset: -2px; }
+/* Off-screen measuring copy at the sheet's content width. */
+.rp-measure { position: absolute; left: -200vw; top: 0; width: 182mm; visibility: hidden; pointer-events: none; }
+/* flow-root: child margins stay inside the box, so measured == placed. */
+.rp-measure-block, .rp-block { display: flow-root; break-inside: avoid; }
+.rp-block-table { padding-bottom: 1.5mm; }
+.rp-chapter, .rp-chapter-cont, .rp-flow { margin: 0; }
+
+/* ---- document ---- */
+.rp-head { border-bottom: 2px solid var(--rp-text); padding-bottom: 8px; margin-bottom: 8px; }
+.rp-title { font-size: 20px; font-weight: 700; text-align: center; letter-spacing: .1em; margin-bottom: 8px; }
+.rp-meta { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 3px 12px; margin: 0; font-size: 11.5px; }
+.rp-meta dt { color: var(--rp-muted); }
+.rp-meta dd { margin: 0; }
+.rp-section { font-size: 15px; margin: 12px 0 6px; padding-left: 8px; border-left: 4px solid var(--rp-accent); }
+.rp-chapter h3 { font-size: 13.5px; margin: 8px 0 4px; display: flex; align-items: center; gap: 8px; }
+.rp-badge { font-size: 10.5px; font-weight: 400; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--rp-line); color: var(--rp-muted); }
+.rp-badge-pending { border-style: dashed; }
+.rp-badge-failed { color: var(--rp-bad); border-color: var(--rp-bad); }
+.rp-prose p { margin: 0 0 5px; font-size: 12.5px; line-height: 1.8; }
+.rp-placeholder { color: var(--rp-muted); font-size: 12px; margin: 3px 0; padding: 5px 10px; border: 1px dashed var(--rp-line); border-radius: 4px; }
+.rp-failed { color: var(--rp-bad); border-color: var(--rp-bad); }
+.rp-subitems { margin: 3px 0 0 18px; padding: 0; font-size: 11.5px; color: var(--rp-muted); line-height: 1.7; }
+.rp-radiologist { margin: 6px 0 0; padding: 6px 10px; background: var(--rp-paper-2); border-left: 3px solid var(--rp-muted); border-radius: 3px; font-size: 12px; line-height: 1.7; }
+.rp-radiologist p { margin: 0; }
+.rp-radiologist-label { font-weight: 600; font-size: 11px; color: var(--rp-muted); margin-bottom: 2px; }
+.rp-note { color: var(--rp-muted); font-size: 11px; margin-top: 2px; line-height: 1.5; }
+.rp-caveats { margin: 5px 0 0; padding-left: 18px; color: var(--rp-muted); font-size: 11px; line-height: 1.6; }
+.rp-items { margin: 0; padding-left: 22px; font-size: 12.5px; line-height: 1.8; }
+.rp-origin { color: var(--rp-muted); font-size: 11px; }
+.rp-table { border-collapse: collapse; font-size: 11.5px; width: 100%; margin: 0; }
+.rp-table th, .rp-table td { border-bottom: 1px solid var(--rp-line); padding: 3px 8px; text-align: left; vertical-align: top; }
+.rp-table th { color: var(--rp-muted); font-weight: 500; }
+.rp-table tr { break-inside: avoid; }
+.rp-table-data th, .rp-table-data td { white-space: nowrap; padding: 2.5px 6px; font-size: 11px; }
+.rp-table-gloss td { font-size: 11px; line-height: 1.5; }
+.rp-row-note td { color: var(--rp-muted); font-size: 11px; }
+.rp-num { font-variant-numeric: tabular-nums; }
+.rp-code { color: var(--rp-muted); font-size: 10px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.rp-mark { display: inline-block; margin-left: 6px; font-size: 11px; color: #d97706; border-bottom: 1px dotted #d97706; }
+.rp-mark-cell { margin-top: 2px; }
+.rp-guard { margin: 6px 0; padding: 6px 10px; font-size: 11.5px; background: rgba(236,131,90,.08); border-left: 3px solid var(--rp-bad); border-radius: 3px; }
+.rp-sign { margin: 14px 0 6px; font-size: 12px; color: var(--rp-muted); display: grid; gap: 6px; }
+.rp-foot { margin-top: 10px; padding-top: 6px; border-top: 1px solid var(--rp-line); font-size: 10.5px; color: var(--rp-muted); }
+.rp-mini { font-size: 11px; padding: 1px 6px; margin-left: 6px; }
+.rp-edit { width: 100%; font: inherit; font-size: 12.5px; line-height: 1.7; color: var(--rp-text); background: var(--rp-paper-2); border: 1px solid var(--rp-accent); border-radius: 4px; padding: 6px 8px; }
+.rp-edit-inline { width: 90%; font: inherit; font-size: 12.5px; color: var(--rp-text); background: var(--rp-paper-2); border: 1px solid var(--rp-accent); border-radius: 4px; padding: 2px 6px; }
+.rp-edit-num { width: 80px; font: inherit; font-size: 12px; color: var(--rp-text); background: var(--rp-paper-2); border: 1px solid var(--rp-accent); border-radius: 4px; padding: 2px 6px; }
+.rp-fail { background: var(--rp-paper); border: 1px solid #6b3a2a; border-radius: 8px; padding: 20px; max-width: 700px; margin: 20px auto; }
+.rp-fail h2 { margin: 0 0 8px; font-size: 14px; color: var(--rp-bad); }
+.rp-raw { color: var(--rp-muted); font-size: 11px; font-family: ui-monospace, monospace; margin-top: 10px; }
+
+/* ---- dashboard blocks inside the chapters ---- */
+.rp-block-title { font-size: 12px; font-weight: 600; margin: 3mm 0 1.5mm; }
+.rp-caveat { background: var(--rp-paper-2); border-left: 3px solid var(--rp-bad); padding: 5px 10px; margin: 0 0 5px; font-size: 11.5px; line-height: 1.6; }
+.rp-implications { margin: 0 0 5px; padding-left: 18px; color: var(--rp-muted); font-size: 11px; line-height: 1.6; }
+.rp-qc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.rp-stat { background: var(--rp-paper-2); border: 1px solid var(--rp-line); border-radius: 4px; padding: 4px 8px; }
+.rp-stat-v { font-size: 16px; font-weight: 600; }
+.rp-stat-l { color: var(--rp-muted); font-size: 10.5px; }
+.rp-conf-row { display: flex; gap: 12px; margin-top: 5px; font-size: 11.5px; align-items: center; }
+.rp-kv { color: var(--rp-muted); }
+.rp-conf-high { color: var(--rp-conf-high); fill: var(--rp-conf-high); }
+.rp-conf-medium { color: var(--rp-conf-medium); fill: var(--rp-conf-medium); }
+.rp-conf-low { color: var(--rp-conf-low); fill: var(--rp-conf-low); }
+.rp-sub { color: var(--rp-muted); font-size: 11px; margin: 0 0 4px; line-height: 1.6; }
+.rp-comp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.rp-comp { background: var(--rp-paper-2); border: 1px solid var(--rp-line); border-radius: 4px; padding: 6px 10px; }
+.rp-comp-title { font-size: 12px; font-weight: 600; margin-bottom: 3px; }
+.rp-comp dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin: 0; font-size: 11.5px; }
+.rp-comp dt { color: var(--rp-muted); }
+.rp-comp dd { margin: 0; }
+.rp-hero-n { font-size: 24px; font-weight: 600; margin: 0 0 2px; }
+.rp-good { color: var(--rp-good); }
+.rp-bad { color: var(--rp-bad); }
+.rp-audit-dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 11.5px; margin: 0; }
+.rp-audit-dl dt { color: var(--rp-muted); }
+.rp-audit-dl dd { margin: 0; }
+.rp-explain { font-size: 11.5px; margin-top: 4px; }
+.rp-explain summary { cursor: pointer; color: var(--rp-accent); }
+.rp-payload { max-height: 320px; overflow: auto; background: var(--rp-bg); border: 1px solid var(--rp-line); padding: 8px; font-size: 10.5px; line-height: 1.5; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--rp-muted); white-space: pre-wrap; }
+
+/* ---- figures ---- */
+/* Spacing is padding, not margin: a figure's fixed height must contain it. */
+.rp-fig { margin: 0; padding-top: 2.5mm; break-inside: avoid; overflow: hidden; }
+.rp-fig-title { font-size: 11.5px; font-weight: 600; margin: 0 0 1.5mm; }
+.rp-fig-row { display: flex; gap: 3mm; align-items: flex-start; }
+.rp-fig-tile, .rp-plate-tile { display: flex; flex-direction: column; margin: 0; flex: none; }
+.rp-fig-box, .rp-plate-box {
+  display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;
+  background: var(--rp-paper-2); border: 1px solid var(--rp-line); box-sizing: border-box;
+}
+.rp-fig-tile figcaption, .rp-plate-tile figcaption { font-size: 9px; color: var(--rp-muted); line-height: 1.3; margin-top: 0.8mm; }
+.rp-fig-missing { font-size: 10px; color: var(--rp-muted); padding: 2mm; text-align: center; line-height: 1.4; }
+.rp-plate-grid { display: flex; flex-direction: column; gap: 1.5mm; }
+.rp-plate-row { display: flex; justify-content: space-between; }
+.rp-plate-tile figcaption { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rp-map { position: relative; flex: none; }
+.rp-map canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: auto; }
+.rp-map svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.rp-map-outline { stroke: var(--rp-text); }
+.rp-map-boundary { stroke: var(--rp-text); opacity: .85; }
+.rp-map-hatch { stroke: var(--rp-muted); }
+.rp-map-bare { stroke: var(--rp-lesion-iv); }
+.rp-map-label { fill: var(--rp-text); stroke: var(--rp-paper); font-weight: 600; font-family: inherit; }
+.rp-map-lesion-ii { stroke: var(--rp-lesion-ii); }
+.rp-map-lesion-iii { stroke: var(--rp-lesion-iii); }
+.rp-map-lesion-iv { stroke: var(--rp-lesion-iv); }
+.rp-map-tip { position: absolute; z-index: 3; font-size: 11px; background: var(--rp-paper); color: var(--rp-text); border: 1px solid var(--rp-line); padding: 2px 6px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
+.rp-fig-foot { display: flex; align-items: center; gap: 5mm; margin-top: 1.5mm; flex-wrap: wrap; }
+.rp-colourbar { width: 64mm; height: 6.5mm; flex: none; }
+.rp-map-legend { display: flex; gap: 3.5mm; flex-wrap: wrap; font-size: 9px; color: var(--rp-muted); align-items: center; }
+.rp-map-legend-note { color: var(--rp-muted); }
+.rp-chip { display: inline-block; width: 9px; height: 9px; margin-right: 3px; vertical-align: -1px; border: 1px solid var(--rp-line); box-sizing: border-box; }
+.rp-chip-grade-0 { background: var(--rp-grade-0); }
+.rp-chip-grade-ii { background: var(--rp-grade-2); }
+.rp-chip-grade-iii { background: var(--rp-grade-3); }
+.rp-chip-grade-iv { background: var(--rp-grade-4); }
+.rp-chip-grade-na { background: var(--rp-grade-na); border-style: dashed; }
+.rp-chip-hatch { background: repeating-linear-gradient(45deg, var(--rp-muted) 0 1px, transparent 1px 3px); }
+.rp-chip-lesion-ii { border: 2px solid var(--rp-lesion-ii); }
+.rp-chip-lesion-iii { border: 2px solid var(--rp-lesion-iii); }
+.rp-chip-lesion-iv { border: 2px solid var(--rp-lesion-iv); }
+.rp-slice { position: relative; flex: none; }
+.rp-slice img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.rp-slice svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.rp-slice-text { fill: #ffffff; stroke: #000000; paint-order: stroke; font-family: inherit; }
+.rp-slice-bar { stroke: #ffffff; }
+.rp-recon { position: relative; display: flex; align-items: center; justify-content: center; }
+.rp-recon img { max-width: 100%; max-height: 100%; display: block; }
+
+/* ---- charts (SVG, colours by class so the print tokens apply) ---- */
+.rp-chart { width: 100%; height: auto; display: block; }
+.rp-chart-text { fill: var(--rp-text); }
+.rp-chart-muted { fill: var(--rp-muted); }
+.rp-chart-grid { stroke: var(--rp-chart-grid); }
+.rp-chart-axis { stroke: var(--rp-muted); }
+.rp-chart-value { fill: var(--rp-chart-value); }
+.rp-chart-halo { fill: var(--rp-paper); }
+.rp-chart-haloed { stroke: var(--rp-paper); }
+.rp-chart-mean { stroke: var(--rp-chart-mean); }
+.rp-band-fill { fill: var(--rp-chart-band); opacity: .16; }
+.rp-band-line { stroke: var(--rp-chart-band); opacity: .5; }
+.rp-band-fill-2 { fill: var(--rp-chart-band); opacity: .07; }
+.rp-band-line-2 { stroke: var(--rp-chart-band); opacity: .22; }
+.rp-band-mean { stroke: var(--rp-chart-band); opacity: .85; }
+.rp-key { display: flex; gap: 14px; align-items: center; font-size: 10.5px; color: var(--rp-muted); margin-bottom: 2px; flex-wrap: wrap; }
+.rp-key i { display: inline-block; vertical-align: middle; margin-right: 4px; }
+.rp-key-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--rp-chart-value); }
+.rp-key-band { width: 26px; height: 10px; border-radius: 2px; background: repeating-linear-gradient(45deg, var(--rp-chart-band) 0 1.6px, transparent 1.6px 6px); opacity: .6; }
+.rp-key-muted { margin-left: auto; }
+.rp-hist-row { display: flex; gap: 2mm; }
+.rp-hist { margin: 0; flex: 1 1 0; min-width: 0; }
+.rp-hist figcaption { font-size: 10px; margin-bottom: 1px; }
+.rp-hist-meta { font-size: 9px; color: var(--rp-muted); line-height: 1.3; }
+
+/* ---- print media: only colours change, never sizes ---- */
+@page { size: 210mm 297mm; margin: 0; }
+@media print {
+  body, .rp-root { background: #ffffff !important; }
+  .rp-root {
+    --rp-bg: #ffffff; --rp-paper: #ffffff; --rp-paper-2: #f3f4f6; --rp-line: #c9ced6;
+    --rp-text: #111111; --rp-muted: #4b5563; --rp-accent: #1f4b7a;
+    --rp-chart-value: #1f5fbf; --rp-chart-band: #6b7280; --rp-chart-grid: #d1d5db; --rp-chart-mean: #111111;
+    --rp-good: #15803d; --rp-warn: #b45309; --rp-bad: #b91c1c;
+    --rp-conf-high: #15803d; --rp-conf-medium: #b45309; --rp-conf-low: #b91c1c;
+    --rp-grade-0: #c4cad2; --rp-grade-2: #f2c14e; --rp-grade-3: #ee7f1a; --rp-grade-4: #c8102e; --rp-grade-na: #ffffff;
+    --rp-lesion-ii: #b8860b; --rp-lesion-iii: #d35400; --rp-lesion-iv: #b00020;
+    --rp-map-unmeasured: #d1d5db;
+  }
+  .rp-toolbar, .rp-measure { display: none !important; }
+  /* Selectors carry [data-view] so they outrank the print-view rules above
+     (same specificity, later in the file) - otherwise the screen margins
+     and the 297mm sheet height would survive into the print engine. */
+  .rp-root[data-view] .rp-page { width: auto; padding: 0; margin: 0; box-shadow: none; }
+  .rp-root[data-view] .rp-sheets { display: block; }
+  /* A hair under the page height: a sheet exactly 297mm tall spills a
+     blank page from rounding, and the footer sits 6mm up anyway. */
+  .rp-root[data-view] .rp-sheet { margin: 0; box-shadow: none; border: none; min-height: 0; height: 296.5mm; overflow: hidden; break-after: page; page-break-after: always; }
+  .rp-root[data-view] .rp-sheet:last-child { break-after: auto; page-break-after: auto; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
 
 /* Generation progress in the sidebar: real steps, not an animation. */
 .sr-progress { height: 4px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }

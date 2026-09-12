@@ -74,6 +74,13 @@ try {
   check('打印视图文字为深色', printStyle.color === 'rgb(17, 17, 17)', printStyle.color)
   check('打印视图 color-scheme 为 light', /light/.test(printStyle.scheme), printStyle.scheme)
   check('纸面宽度为 A4 (210mm ≈ 794px)', Math.abs(parseFloat(printStyle.width) - 794) < 6, printStyle.width)
+  const sheets = await page.evaluate(() => [...document.querySelectorAll('.rp-sheet')].map((s) => ({
+    h: s.getBoundingClientRect().height, over: s.scrollHeight > s.clientHeight + 1,
+    head: s.querySelector('.rp-sheet-head')?.textContent ?? '', foot: s.querySelector('.rp-sheet-foot')?.textContent ?? '',
+  })))
+  check('显式 A4 页（≥4 页，每页 297mm ≈ 1123px）', sheets.length >= 4 && sheets.every((s) => Math.abs(s.h - 1123) < 6), sheets.map((s) => s.h.toFixed(0)).join('/'))
+  check('没有页溢出', sheets.every((s) => !s.over))
+  check('每页有页眉页码与页脚声明', sheets.every((s, i) => new RegExp(`第 ${i + 1} / ${sheets.length} 页`).test(s.head) && /非诊断结论/.test(s.foot)), sheets[0]?.head)
 
   // Pixel check on the page element itself: >90% near-white.
   const el = await page.$('.rp-page')
@@ -101,22 +108,28 @@ try {
   await open('edit')
   const nameBox = await page.$('.rp-editor')
   await retype(page, nameBox, '测试医师')
-  const sel = await page.$('#ch-cartilage select')
+  // The chapter may span sheets; every fragment carries data-chapter, only
+  // the first carries the id.
+  const CART = '[data-chapter="cartilage"]'
+  const sel = await page.$(`${CART} select`)
   check('编辑视图里分级可改', !!sel)
+  check('软骨章锚点仍在', !!(await page.$('#ch-cartilage')))
   if (sel) {
-    const before = await page.$eval('#ch-cartilage select', (e) => e.value)
+    const before = await page.$eval(`${CART} select`, (e) => e.value)
     const target = before === 'III' ? 'II' : 'III'
-    await page.select('#ch-cartilage select', target)
+    await page.select(`${CART} select`, target)
     await sleep(2500)
     await open('print')
-    const mark = await page.evaluate(() => document.querySelector('#ch-cartilage .rp-mark')?.textContent ?? '')
+    const mark = await page.evaluate((c) => document.querySelector(`${c} .rp-mark`)?.textContent ?? '', CART)
     check('刷新后修改仍在并标注原值与医师', /医师修改（原值/.test(mark) && /测试医师/.test(mark), mark.slice(0, 80))
+    const starred = await page.evaluate((c) => [...document.querySelectorAll(`${c} .rp-map-grade text`)].some((t) => /\*$/.test(t.textContent ?? '')), CART)
+    check('分级图上标出医师修改（*）', starred)
 
     // put it back so the next run starts clean
     await open('edit')
-    const revoke = await page.$('#ch-cartilage .rp-mini')
+    const revoke = await page.$(`${CART} .rp-mini`)
     if (revoke) { await revoke.click(); await sleep(1500) }
-    const after = await page.evaluate(() => document.querySelector('#ch-cartilage .rp-mark'))
+    const after = await page.evaluate((c) => document.querySelector(`${c} .rp-mark`), CART)
     check('撤销后标记消失', after === null)
   }
 
@@ -128,6 +141,11 @@ try {
     check('服务端 PDF 返回 application/pdf', (r.headers.get('content-type') || '').includes('application/pdf'), r.headers.get('content-type') ?? '')
     check('服务端 PDF 是真实 PDF 且不小', buf.length > 20000 && buf.slice(0, 4).toString() === '%PDF', `${buf.length} bytes`)
     check('下载文件名', /report_\d+\.pdf/.test(r.headers.get('content-disposition') || ''), r.headers.get('content-disposition') ?? '')
+    // One PDF page per sheet: the page plan is ours, Chromium only prints it.
+    // Skia writes the page tree uncompressed, so /Count is readable directly.
+    const counts = [...buf.toString('latin1').matchAll(/\/Count\s+(\d+)/g)].map((m) => Number(m[1]))
+    const pdfPages = counts.length ? Math.max(...counts) : -1
+    check('PDF 页数 = 页元素数（无空白尾页）', pdfPages === sheets.length, `${pdfPages} vs ${sheets.length}`)
   } else {
     console.log(`  skip  服务端 PDF 不可用: ${status.detail}`)
   }

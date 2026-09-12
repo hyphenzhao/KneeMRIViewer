@@ -84,8 +84,9 @@ header 原样写回**（不从自己的 origin/direction 重建——那正是�
 
 ## 软骨定量测量与 AI 报告
 
-阅片页右侧栏（分割标签下方）可就地生成中文诊断报告；「查看详细报告」弹出指标看板，
-把 22 个亚区的厚度、体积、内外侧对称性画成图。
+阅片页右侧栏（分割标签下方）可就地生成中文诊断报告；「查看详细报告」打开**唯一的一份图文报告**
+（`#/report/<segId>`，见下文），软骨章里有关键层截图、三维重建、厚度展开图、Outerbridge 分级图、
+22 个亚区的参考带点图与厚度分布；旧的 `#/metrics/` 链接重定向到它。
 
 ### 测量口径
 
@@ -166,6 +167,26 @@ API Key 只写入不读出：存在服务器上权限 0600 的文件里，任何
   复核通过时冻结 `signed_json`；重新生成一律重置复核状态。
 - **放射科报告导入**：`reports_file` 指向 `knee_MR_report.xlsx`（`序号` 与 DICOM 目录同编号；88/157 行的
   影像描述与诊断意见相同，已标记）。含姓名列的文件会被拒绝。
+
+### 图文报告：图形与 A4 分页
+
+报告只有一种，图在章节里而不是另开一个看板。图形在形态学计算的同一进程里、用同一批顶点画出，
+和数字一起按 `(算法版本, 参数哈希)` 缓存在 `cache/fig/`，清单存 `segmentation_morphometry.figures_json`，
+经 `GET /segmentations/{id}/figures/{name}` 提供（只读缓存，永不触发计算）。`morph/figures.py`：
+
+| 图 | 做法 |
+|---|---|
+| 三平面关键层 | 服务端 numpy + Pillow：过最重病灶（否则 ccMF 中心）的矢/冠/轴位，标签轮廓按标签集配色；轴位过髌软骨中心。像素按整数倍补方，重建面保持块状——3 mm 层就是这么多信息 |
+| 三维重建 | 浏览器 vtk.js 由缓存网格离屏渲染一次、截成 PNG（服务器无显示，VTK 离屏会崩） |
+| 厚度展开图 | 每块软骨板压平到**分区自己的二维坐标**（股骨沿拟合圆展开、胫骨平台俯视、髌骨关节面），面积加权栅格化到 0.5 mm 像素，附类别层（实测 / 不可靠 / 插补 / 骨面裸露）、亚区层、病灶层；浏览器画 canvas + SVG 叠加（边界、代码、病灶轮廓、色标），文字与线条在纸上仍是矢量 |
+| 分级图 | 同一轮廓按各亚区**生效**分级填色（医师修改带 `*`），病灶轮廓按自身分级着色 |
+| 亚区点图、直方图 | 原看板图表，配色全部走 `--rp-*` 令牌，pattern id 逐实例唯一 |
+
+分页是我们自己的（`web/src/pages/report/sheets/`）：块先在 182 mm 宽的离屏容器里量高，再贪心排到
+`.rp-sheet`（210×297 mm，页眉页脚画在页内）上；表格按行切、表头重复；图形高度以毫米固定，排版不等像素。
+图 1-3 合占一页（62 + 112 + 84 mm）。`@media print` 只改颜色不改尺寸，所以屏幕量的高度就是打印的高度；
+服务端 PDF 用零边距、不加 Chromium 页眉页脚，`data-report-ready` 要等所有图形（含 WebGL 快照）画完、
+分页完成才置 1。股骨分区的角度原点现在放在髁的空弧里（外侧滑车越过 0° 时不再被算进后髁）。
 
 ### Outerbridge（厚度推导，非信号）
 
@@ -286,13 +307,13 @@ tier 2 也会在浏览器第一次打开该序列时自动触发。两级都按
 ## 测试
 
 ```bash
-cd server && python -m pytest tests/ -q        # 160 项：几何、体模、分区、平滑、去标识化、护栏、报告框架、分级
+cd server && python -m pytest tests/ -q        # 181 项：几何、体模、分区、平滑、去标识化、护栏、报告框架、分级、图形
 node tests/integration_check.mjs               # 对着运行中的服务跑完整数据链路
 node tests/browser_check.mjs                   # 无头 Chromium，逐像素验证四窗口
 node tests/browser_switch_check.mjs            # 病例切换：ID 冲突、残留清空
-node tests/metrics_check.mjs                   # 指标看板
-node tests/report_flow_check.mjs               # 两段侧栏、弹窗、章节框架、AI 管理
-node tests/report_views_check.mjs              # 打印视图白底 A4、编辑覆盖、服务端 PDF
+node tests/report_figures_check.mjs            # 图文报告：图形已画出、A4 页不溢出、互换病例零图
+node tests/report_flow_check.mjs               # 侧栏一键生成、弹窗、章节框架、AI 管理
+node tests/report_views_check.mjs              # 打印视图白底 A4 页、编辑覆盖、服务端 PDF 页数
 bash packaging/verify_no_cdn.sh web/dist       # 离线校验：不得有任何外部请求
 ```
 
