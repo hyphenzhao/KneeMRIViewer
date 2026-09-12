@@ -457,7 +457,7 @@ body:has(.rp-root) { overflow: auto; }
 .rp-meta dd { margin: 0; }
 
 .rp-section { font-size: 15px; margin: 18px 0 8px; padding-left: 8px; border-left: 4px solid var(--rp-accent); }
-.rp-chapter { margin: 0 0 14px; break-inside: avoid; }
+.rp-chapter { margin: 0 0 14px; }                 /* may break: a long chapter must not push a whole page blank */
 .rp-chapter h3 { font-size: 13.5px; margin: 10px 0 6px; display: flex; align-items: center; gap: 8px; break-after: avoid; }
 .rp-badge { font-size: 10.5px; font-weight: 400; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--rp-line); color: var(--rp-muted); }
 .rp-badge-pending { border-style: dashed; }
@@ -473,7 +473,8 @@ body:has(.rp-root) { overflow: auto; }
 .rp-caveats { margin: 6px 0 0; padding-left: 18px; color: var(--rp-muted); font-size: 11.5px; line-height: 1.7; }
 .rp-items { margin: 0; padding-left: 22px; font-size: 13px; line-height: 1.9; }
 .rp-origin { color: var(--rp-muted); font-size: 11.5px; }
-.rp-table { border-collapse: collapse; font-size: 12px; width: 100%; margin: 6px 0 4px; break-inside: avoid; }
+.rp-table { border-collapse: collapse; font-size: 12px; width: 100%; margin: 6px 0 4px; }
+.rp-table thead { display: table-header-group; }   /* header repeats on each printed page */
 .rp-table th, .rp-table td { border-bottom: 1px solid var(--rp-line); padding: 4px 8px; text-align: left; vertical-align: top; }
 .rp-table th { color: var(--rp-muted); font-weight: 500; }
 .rp-table tr { break-inside: avoid; }
@@ -512,8 +513,8 @@ body:has(.rp-root) { overflow: auto; }
   }
   .rp-toolbar { display: none !important; }
   .rp-page { width: auto; max-width: none; margin: 0; padding: 0; box-shadow: none; }
-  .rp-chapter, .rp-table, figure { break-inside: avoid; }
-  h2, h3 { break-after: avoid; }
+  figure, .rp-prose p, .rp-placeholder, .rp-radiologist, .rp-sign, .rp-item { break-inside: avoid; }
+  h2, h3, .rp-section { break-after: avoid; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 .rp-btn { display: inline-block; font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 4px 10px; text-decoration: none; }
