@@ -3,6 +3,22 @@
 # (the development server), Ubuntu 22.04, stock python3.10. Output: one tarball to carry
 # to the A100/H100 box.
 set -euo pipefail
+
+# --- server-side PDF: headless Chromium + its shared libraries + CJK fonts ---
+# Downloaded here, on the build box, so the air-gapped target never needs a
+# network. The Chromium build must match the playwright wheel in requirements.
+echo "== chromium for PDF =="
+PW_VENV="$(mktemp -d)/pwvenv"
+python3 "$HERE/deploy/virtualenv.pyz" --no-download "$PW_VENV" >/dev/null
+"$PW_VENV/bin/pip" -q install "playwright==1.62.0"
+PLAYWRIGHT_BROWSERS_PATH="$OUT/ms-playwright" "$PW_VENV/bin/python" -m playwright install chromium-headless-shell
+mkdir -p "$OUT/debs"
+PKGS="$("$PW_VENV/bin/python" -m playwright install-deps --dry-run chromium-headless-shell 2>/dev/null \
+        | grep -oE '(^|\s)[a-z0-9.+-]+(\s|$)' | tr -d ' ' | grep -vE '^(apt-get|install|sudo|--)' | sort -u | tr '\n' ' ')"
+apt-get install --download-only --reinstall -y -o Dir::Cache::archives="$OUT/debs" \
+  $PKGS fonts-noto-cjk fontconfig 2>/dev/null || echo "WARNING: some .deb downloads failed; PDF may need manual deps on the target"
+ls "$OUT/debs"/*.deb 2>/dev/null | wc -l | xargs echo "  debs:"
+
 cd "$(dirname "$0")/.."
 OUT="${1:-bundle}"
 PYVER=310

@@ -44,6 +44,8 @@ export default function ReportPage() {
   const [doc, setDoc] = useState<ReportDocument | null>(null)
   const [busy, setBusy] = useState(true)
   const [err, setErr] = useState('')
+  const [pdfOk, setPdfOk] = useState<{ available: boolean; detail: string | null } | null>(null)
+  useEffect(() => { api.pdfStatus().then(setPdfOk).catch(() => setPdfOk({ available: false, detail: null })) }, [])
   const [editor, setEditor] = useState(() => {
     try { return localStorage.getItem('mriv.editor') ?? '' } catch { return '' }
   })
@@ -166,7 +168,12 @@ export default function ReportPage() {
             title="重新计算并重写；医生的修改会保留并标为需复核">重新生成</button>
           <button onClick={() => review('approved')} disabled={busy || !doc}>复核通过</button>
           <button onClick={() => review('rejected')} disabled={busy || !doc}>不通过</button>
-          <button onClick={() => window.print()} disabled={!doc}>打印 / 另存 PDF</button>
+          <button onClick={() => window.print()} disabled={!doc}>浏览器打印</button>
+          {segId != null && (
+            pdfOk?.available
+              ? <a className="rp-btn" href={api.reportPdfUrl(segId)}>下载 PDF</a>
+              : <button disabled title={pdfOk?.detail ?? '服务器端 PDF 渲染不可用'}>下载 PDF</button>
+          )}
           {segId != null && <a className="rp-link" href={`#/metrics/${segId}`} target="_blank" rel="noopener">交互看板 ↗</a>}
         </header>
       )}

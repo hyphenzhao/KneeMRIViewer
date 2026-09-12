@@ -148,6 +148,43 @@ API Key 只写入不读出：存在服务器上权限 0600 的文件里，任何
 
 ---
 
+## 结构化膝关节报告（章节框架）
+
+`#/report/<segId>`。一份文档、固定章节、三种视图（网页 / 打印 / 编辑），阅片页右侧栏
+「软骨报告」与「膝关节报告」两个入口都打开它。
+
+- **框架在 `server/reports/knee_zh_v1.yaml`**：章节顺序取自本院 157 份样例报告的固定套话
+  （骨 → 软骨 → 积液/滑膜 → 半月板 → 韧带肌腱 → 囊肿 → 软组织 → 印象 → 建议 → 定量附录）。
+  每章声明数据来源：`computed`（本平台算法）/ `model`（影像模型）/ `radiologist` / `composed` / `pending`。
+- **`pending` 章节绝不产生正文**，只显示「本次未评估（尚未接入相应模型）」。若该病例有放射科原始报告，
+  其相关句子按章节附上，标签固定为「放射科报告」——引用，不冒充。接入一个新模型 = 在
+  `report/sources.py` 注册一个 resolver + 改 YAML 的 `source`。
+- **所有数字来自计算**（`facts`/`grades` 取自形态学结果，不取自正文）；AI 只解读软骨章，禁用词按章节配置。
+- **医生可改文字、数字、分级**（`report_document.overrides_json`）：每处修改保留原值、修改人、时间，
+  打印件上显示「医师修改（原值 X）」；重新生成后修改保留并标「请复核」；每次修改进只追加的 `report_edit_log`。
+  复核通过时冻结 `signed_json`；重新生成一律重置复核状态。
+- **放射科报告导入**：`reports_file` 指向 `knee_MR_report.xlsx`（`序号` 与 DICOM 目录同编号；88/157 行的
+  影像描述与诊断意见相同，已标记）。含姓名列的文件会被拒绝。
+
+### Outerbridge（厚度推导，非信号）
+
+`morph/outerbridge.py` + `morph/coverage.py`。II/III 由**局灶**厚度缺失判定，基线是周围约 10 mm 内软骨的
+平均厚度（两遍估计，病灶不参与自己的基线）；软骨板边缘 3 mm 内不评估；只跨一层的斑块不报；
+IV 级来自被软骨包围（包围度 ≥ 0.8）的裸露骨面。**I 级需信号信息，本方法不评估，每份报告都写明。**
+阈值在 `refs/knee_cartilage_reference_v1.yaml` 的 `outerbridge:` 块，改动即产生新的形态学记录。
+
+8 例标注膝的结果：7 例全部 0 级，1 例两处 IV；这些病例的放射科报告均未提及软骨病变。
+样例报告里没有任何正式分级，因此这一层**无法用样例监督**，是新增的、须医生复核的输出。
+
+### PDF
+
+打印视图是白底 A4 栏，浏览器 Ctrl+P 即可另存 PDF。服务端 PDF（`GET /api/v1/segmentations/{id}/report.pdf`）
+用 Playwright 的无头 Chromium 渲染同一打印视图，页眉去标识化、页脚免责声明、页码。
+`mrictl doctor` 显示 playwright / Chromium / 中文字体状态，`mrictl pdf-selftest` 渲染一段中文供人工核对字形。
+离线包由 `packaging/build_bundle.sh` 在联网构建机上带上 `chromium-headless-shell`、其共享库 .deb 与 `fonts-noto-cjk`。
+
+---
+
 ## 架构
 
 ```
@@ -248,12 +285,13 @@ tier 2 也会在浏览器第一次打开该序列时自动触发。两级都按
 ## 测试
 
 ```bash
-cd server && python -m pytest tests/ -q        # 93 项：几何、体模、分区、去标识化、护栏
+cd server && python -m pytest tests/ -q        # 160 项：几何、体模、分区、平滑、去标识化、护栏、报告框架、分级
 node tests/integration_check.mjs               # 对着运行中的服务跑完整数据链路
 node tests/browser_check.mjs                   # 无头 Chromium，逐像素验证四窗口
 node tests/browser_switch_check.mjs            # 病例切换：ID 冲突、残留清空
 node tests/metrics_check.mjs                   # 指标看板
-node tests/report_flow_check.mjs               # 报告入口、弹窗、AI 管理
+node tests/report_flow_check.mjs               # 两段侧栏、弹窗、章节框架、AI 管理
+node tests/report_views_check.mjs              # 打印视图白底 A4、编辑覆盖、服务端 PDF
 bash packaging/verify_no_cdn.sh web/dist       # 离线校验：不得有任何外部请求
 ```
 

@@ -21,6 +21,15 @@ python3 "$HERE/virtualenv.pyz" --no-download "$PREFIX/venv"
   -r "$HERE/server/requirements.in"
 "$PREFIX/venv/bin/pip" install --no-index --no-deps "$HERE/server"
 
+echo "== pdf rendering (optional) =="
+if ls "$HERE"/debs/*.deb >/dev/null 2>&1; then
+  dpkg -i "$HERE"/debs/*.deb >/dev/null 2>&1 || apt-get -f install --no-download -y >/dev/null 2>&1 || true
+  fc-cache -f >/dev/null 2>&1 || true
+fi
+if [ -d "$HERE/ms-playwright" ]; then
+  rm -rf "$PREFIX/ms-playwright"; cp -r "$HERE/ms-playwright" "$PREFIX/ms-playwright"
+fi
+
 echo "== application files =="
 cp -r "$HERE/web/." "$PREFIX/web/"
 cp -r "$HERE/labelsets/." "$PREFIX/labelsets/"

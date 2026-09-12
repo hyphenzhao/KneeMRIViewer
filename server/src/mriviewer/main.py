@@ -707,6 +707,39 @@ def report_document_review(doc_id: int, payload: dict[str, Any]) -> dict[str, An
         raise HTTPException(400, str(exc)) from exc
 
 
+@app.get("/api/v1/pdf/status")
+def pdf_status() -> dict[str, Any]:
+    from .report.pdf import pdf_available
+    return pdf_available(cfg())
+
+
+@app.get("/api/v1/segmentations/{seg_id}/report.pdf")
+def report_pdf(seg_id: int) -> Response:
+    """The print view of the report document, rendered to A4 by headless Chromium.
+
+    A plain `def` on purpose: Playwright's sync API cannot run on the event
+    loop thread, and FastAPI runs sync handlers in its thread pool.
+    """
+    from .report.document import get_document
+    from .report.pdf import pdf_available, render_report_pdf
+    _seg_row(seg_id)
+    doc = get_document(db(), seg_id)
+    if doc is None:
+        raise HTTPException(409, "尚未生成报告文档，请先在阅片页生成膝关节报告")
+    avail = pdf_available(cfg())
+    if not avail["available"]:
+        raise HTTPException(503, avail["detail"] or "PDF 渲染不可用")
+    try:
+        pdf = render_report_pdf(cfg(), seg_id, doc.get("header") or {},
+                                (doc.get("header") or {}).get("disclaimerZh") or "")
+    except Exception as exc:                     # noqa: BLE001
+        raise HTTPException(500, "PDF 渲染失败：%s" % str(exc)[:300]) from exc
+    return Response(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": 'attachment; filename="report_%d.pdf"' % doc["id"],
+        "Cache-Control": "no-store",
+    })
+
+
 @app.get("/api/v1/references/{key}")
 def references(key: str) -> dict[str, Any]:
     """Clinical reference values, served from a YAML file doctors can edit.

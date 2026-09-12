@@ -191,7 +191,8 @@ def cmd_doctor(args) -> int:
     for mod, why in [("numpy", "arrays"), ("pydicom", "DICOM"), ("nibabel", "NIfTI"),
                      ("SimpleITK", "resampling"), ("scipy", "downsampling"),
                      ("openpyxl", "patient list.xlsx"), ("yaml", "label sets"),
-                     ("fastapi", "API"), ("uvicorn", "server"), ("vtk", "3D meshes")]:
+                     ("fastapi", "API"), ("uvicorn", "server"), ("vtk", "3D meshes"),
+                     ("playwright", "PDF (optional)")]:
         try:
             m = __import__(mod)
             v = getattr(m, "__version__", getattr(m, "VTK_VERSION", "?"))
@@ -243,6 +244,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--limit", type=int)
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_materialize)
+
+    p = sub.add_parser("pdf-selftest", help="render a CJK sample to PDF+PNG for a glyph check")
+    p.set_defaults(func=cmd_pdf_selftest)
 
     p = sub.add_parser("mesh", help="precompute 3D label surfaces")
     p.add_argument("--terracing-report", action="store_true",
@@ -328,4 +332,23 @@ def _terracing_report(args) -> int:
             print("%6d %6d %9.1f%% %9.1f%% %7.0f%%  %s" % (
                 sid, value, 100 * f_old, 100 * f_new,
                 100 * (f_new - f_old) / f_old if f_old else 0.0, chosen))
+    return 0
+
+
+def cmd_pdf_selftest(args) -> int:
+    """Renders a fixed Chinese sample. Look at the PNG: tofu boxes mean the
+    CJK font is missing, and no program can tell that for you."""
+    from .config import load_config
+    from .report.pdf import pdf_available, selftest_pdf
+
+    cfg = load_config(getattr(args, "config", None))
+    st = pdf_available(cfg)
+    print("playwright:", st["playwright"], "| chromium:", st["chromium"],
+          "| fonts:", ", ".join(st["fonts"][:4]) or "-")
+    if not st["available"]:
+        print("PDF unavailable:", st["detail"])
+        return 1
+    out = selftest_pdf(cfg, cfg.state_dir)
+    print("wrote", out["png"], "and", out["pdf"], "(%d bytes)" % out["bytes"])
+    print("open the PNG and confirm the Chinese renders as glyphs, not boxes")
     return 0

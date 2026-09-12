@@ -28,3 +28,5 @@ pylibjpeg-openjpeg
 # air-gapped box. Without VTK the mesh pipeline falls back to scikit-image,
 # which works but is visibly rougher.
 vtk>=9.3,<9.4
+# Server-side PDF rendering (optional at runtime; the report page prints without it)
+playwright==1.62.0

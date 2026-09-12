@@ -5,6 +5,8 @@ After=network.target
 RequiresMountsFor=/srv/mridata
 
 [Service]
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/mriviewer/ms-playwright
+Environment=HOME=/var/lib/mriviewer
 Type=simple
 User=mriviewer
 Group=mriviewer

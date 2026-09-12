@@ -68,6 +68,21 @@ class AiConfig:
 
 
 @dataclass
+class PdfConfig:
+    """Server-side PDF rendering with headless Chromium (Playwright).
+
+    ``base_url`` is where Chromium fetches the print view - this same server,
+    on loopback. ``browsers_path`` is where the offline bundle installs the
+    browser. ``no_sandbox`` is a last resort for kernels with unprivileged
+    user namespaces disabled; leave it off unless mrictl doctor says so.
+    """
+    base_url: str | None = None
+    browsers_path: Path | None = None
+    timeout_s: float = 90.0
+    no_sandbox: bool = False
+
+
+@dataclass
 class Config:
     bind_host: str = "0.0.0.0"
     bind_port: int = 8080
@@ -86,6 +101,7 @@ class Config:
     browser_volume_budget: int = 150 * 1024 * 1024
     datasets: list[DatasetConfig] = field(default_factory=list)
     ai: AiConfig = field(default_factory=AiConfig)
+    pdf: PdfConfig = field(default_factory=PdfConfig)
 
     @property
     def db_path(self) -> Path:
@@ -142,6 +158,13 @@ def load_config(path: str | os.PathLike | None = None) -> Config:
         cfg.refs_dir = Path(raw["refs_dir"]).expanduser()
     if "reports_dir" in raw:
         cfg.reports_dir = Path(raw["reports_dir"]).expanduser()
+    if "pdf" in raw:
+        pdf_raw = raw["pdf"]          # not `p`: that name is the config path below
+        for name in ("base_url", "timeout_s", "no_sandbox"):
+            if name in pdf_raw:
+                setattr(cfg.pdf, name, pdf_raw[name])
+        if "browsers_path" in pdf_raw:
+            cfg.pdf.browsers_path = Path(pdf_raw["browsers_path"]).expanduser()
     if "ai" in raw:
         a = raw["ai"]
         for name in ("enabled", "allow_egress", "base_url", "model", "timeout_s",

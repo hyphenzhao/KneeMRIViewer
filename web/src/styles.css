@@ -516,3 +516,5 @@ body:has(.rp-root) { overflow: auto; }
   h2, h3 { break-after: avoid; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+.rp-btn { display: inline-block; font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 4px 10px; text-decoration: none; }
+.rp-btn:hover { border-color: var(--accent); }

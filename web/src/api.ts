@@ -442,6 +442,8 @@ export const api = {
     ),
   references: (key: string) => json<ReferenceSet>(`/references/${key}`),
   aiStatus: () => json<AiStatus>('/ai/status'),
+  pdfStatus: () => json<{ available: boolean; detail: string | null; chromium: string | null }>('/pdf/status'),
+  reportPdfUrl: (segId: number) => `${BASE}/segmentations/${segId}/report.pdf`,
 
   reportTemplate: (key: string) => json<Record<string, unknown>>(`/report-templates/${key}`),
   /** Absence is `exists: false`, never a 404. */
