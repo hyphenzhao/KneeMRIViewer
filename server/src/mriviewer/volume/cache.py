@@ -75,8 +75,19 @@ class VolumeCache:
     def segmentation(self, key: str, variant: str = "native") -> CacheEntry:
         return self._entry("seg", key, variant)
 
-    def mesh_path(self, seg_key: str, label_value: int) -> Path:
-        return self.root / "mesh" / seg_key[:2] / seg_key / (str(label_value) + ".mesh.gz")
+    def mesh_path(self, seg_key: str, label_value: int, pipeline: int | None = None) -> Path:
+        """Display-mesh file for one label.
+
+        The pipeline version is part of the file name, so changing how surfaces
+        are built leaves the old files untouched and unlisted instead of serving
+        a surface the current code would not produce. Pipeline-1 files have no
+        suffix and are simply never listed again.
+        """
+        if pipeline is None:
+            from ..seg.mesh import MESH_PIPELINE_VERSION
+            pipeline = MESH_PIPELINE_VERSION
+        name = "%d.m%d.mesh.gz" % (label_value, pipeline)
+        return self.root / "mesh" / seg_key[:2] / seg_key / name
 
     def thumb_path(self, key: str) -> Path:
         return self.root / "thumb" / key[:2] / (key + ".jpg")

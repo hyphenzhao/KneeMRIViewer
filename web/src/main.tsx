@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 
 import App from './App'
 import MetricsPage from './pages/MetricsPage'
+import ReportPage from './pages/ReportPage'
 import './styles.css'
 
 /**
@@ -20,6 +21,7 @@ function Router() {
     window.addEventListener('hashchange', on)
     return () => window.removeEventListener('hashchange', on)
   }, [])
+  if (hash.startsWith('#/report/')) return <ReportPage />
   return hash.startsWith('#/metrics/') ? <MetricsPage /> : <App />
 }
 

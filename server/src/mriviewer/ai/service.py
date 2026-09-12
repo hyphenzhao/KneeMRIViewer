@@ -79,8 +79,13 @@ def _row_to_json(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
-def generate_report(conn: sqlite3.Connection, cfg: Any, seg_id: int) -> dict[str, Any]:
-    """Produce a new report version for this segmentation."""
+def generate_report(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
+                    banned_terms: list[str] | None = None) -> dict[str, Any]:
+    """Produce the cartilage report for this segmentation (replacing any prior one).
+
+    ``banned_terms`` lets the chapter template decide what this chapter's AI
+    may not mention; None keeps the module default.
+    """
     from ..morph.service import compute_and_store
 
     ai = resolved_ai(conn, cfg)
@@ -102,7 +107,7 @@ def generate_report(conn: sqlite3.Connection, cfg: Any, seg_id: int) -> dict[str
         patient_context=list(ai.patient_context),
     )
 
-    report, status, error, guard, llm = _produce(cfg, ai, payload)
+    report, status, error, guard, llm = _produce(cfg, ai, payload, banned_terms)
 
     # Replace, do not append: the clinician sees exactly one current report.
     # version_int survives as "how many times this has been generated", which is
@@ -154,7 +159,8 @@ def generate_report(conn: sqlite3.Connection, cfg: Any, seg_id: int) -> dict[str
     return out
 
 
-def _produce(cfg: Any, ai: Any, payload: dict[str, Any]):
+def _produce(cfg: Any, ai: Any, payload: dict[str, Any],
+             banned_terms: list[str] | None = None):
     """Try the model; fall back deterministically on any problem.
 
     Returns (report, status, error, guardrail_result, llm_response).
@@ -188,7 +194,7 @@ def _produce(cfg: Any, ai: Any, payload: dict[str, Any]):
             messages.append({"role": "user", "content": "上一次回复不是合法 json，请只输出 json 对象。"})
             continue
 
-        guard = check(parsed, payload)
+        guard = check(parsed, payload, banned_terms=banned_terms)
         last_guard = guard
         if guard.ok:
             return parsed, "ok", None, guard, resp

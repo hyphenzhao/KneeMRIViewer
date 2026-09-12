@@ -87,27 +87,31 @@ try {
   })
   check('侧栏有分割标签列表', placement.labels)
   check('侧栏有诊断报告区块', placement.report)
+  const sections = await page.$$eval('.sidebar.right .sr .section-title',
+    (els) => els.map((e) => e.textContent?.trim().replace(/●.*$/, '').trim()))
+  check('侧栏有「软骨报告」与「膝关节报告」两段', sections[0] === '软骨报告' && sections[1] === '膝关节报告',
+    sections.join('/'))
   check('报告区块在分割标签之后', placement.after === true)
   check('旧的顶部入口已移除', placement.oldEntryGone === true)
 
   // ---- 2. generate, and render like the radiologist report ----------------
-  const hadReport = await page.$('.sr dl.report')
+  const hadReport = await page.$('.sr:not(.sr-knee) dl.report')
   if (!hadReport) {
-    await page.click('.sr-primary')
-    await page.waitForSelector('.sr dl.report', { timeout: 180000 })
+    await page.click('.sr:not(.sr-knee) .sr-primary')
+    await page.waitForSelector('.sr:not(.sr-knee) dl.report', { timeout: 180000 })
   }
   await sleep(1000)
 
   const card = await page.evaluate(() => {
-    const titles = [...document.querySelectorAll('.sr dl.report dt')].map((e) => e.textContent)
-    const dds = [...document.querySelectorAll('.sr dl.report dd')].map((e) => e.textContent ?? '')
+    const titles = [...document.querySelectorAll('.sr:not(.sr-knee) dl.report dt')].map((e) => e.textContent)
+    const dds = [...document.querySelectorAll('.sr:not(.sr-knee) dl.report dd')].map((e) => e.textContent ?? '')
     return {
       titles,
       shortest: Math.min(...dds.map((d) => d.trim().length)),
-      usesReportClass: !!document.querySelector('.sr dl.report'),
+      usesReportClass: !!document.querySelector('.sr:not(.sr-knee) dl.report'),
       badge: document.querySelector('.sr-badge')?.textContent?.trim() ?? '',
-      buttons: [...document.querySelectorAll('.sr-buttons button')].map((b) => b.textContent?.trim()),
-      disclaim: document.querySelector('.sr-foot .sr-hint')?.textContent ?? '',
+      buttons: [...document.querySelectorAll('.sr:not(.sr-knee) .sr-buttons button')].map((b) => b.textContent?.trim()),
+      disclaim: document.querySelector('.sr:not(.sr-knee) .sr-foot .sr-hint')?.textContent ?? '',
     }
   })
   check('四段齐全', JSON.stringify(card.titles) ===
@@ -126,19 +130,32 @@ try {
       .find((b) => b.textContent?.includes('查看详细报告'))?.click()
   })
   const popupTarget = await browser.waitForTarget(
-    (t) => t.url().includes('#/metrics/'), { timeout: 30000 })
+    (t) => t.url().includes('#/report/'), { timeout: 30000 })
   check('详细报告开了新窗口', !!popupTarget, popupTarget?.url() ?? '')
-  check('新窗口用的是 hash 路由', /#\/metrics\/\d+$/.test(popupTarget.url()),
+  check('新窗口用的是 hash 路由', /#\/report\/\d+/.test(popupTarget.url()),
     popupTarget.url())
 
   const popup = await popupTarget.page()
-  await popup.waitForSelector('.mx-card', { timeout: 180000 })
-  const popupOk = await popup.evaluate(() => ({
-    cards: document.querySelectorAll('.mx-card').length,
-    charts: document.querySelectorAll('.mx-card svg').length,
-  }))
-  check('新窗口里看板已渲染', popupOk.cards >= 4 && popupOk.charts >= 2,
-    `${popupOk.cards} 区块 / ${popupOk.charts} 图`)
+  await popup.waitForSelector('[data-report-ready="1"]', { timeout: 240000 })
+  const rep2 = await popup.evaluate(() => {
+    const titles = [...document.querySelectorAll('.rp-chapter h3, .rp-chapter h2')]
+      .map((e) => e.textContent?.replace(/\s+/g, '').replace(/(算法生成|模型解读|未评估|生成失败)$/, ''))
+    const pending = [...document.querySelectorAll('.rp-chapter-pending')]
+    return {
+      titles,
+      pendingCount: pending.length,
+      pendingText: pending.map((e) => e.textContent ?? '').join(' '),
+      radiologistLabels: document.querySelectorAll('.rp-radiologist-label, .rp-origin').length,
+      disclaimer: document.querySelector('.rp-foot')?.textContent ?? '',
+    }
+  })
+  check('新窗口里章节报告已渲染', rep2.titles.length >= 11, rep2.titles.join('/'))
+  check('章节按本院顺序', rep2.titles.slice(0, 3).join('/') === '检查概况与数据质量/骨皮质与骨髓信号/关节软骨',
+    rep2.titles.slice(0, 3).join('/'))
+  check('未接入模型的章节显示占位', rep2.pendingCount >= 5 && /未评估/.test(rep2.pendingText), `${rep2.pendingCount}`)
+  check('占位章节不断言正常', !/未见异常|光整|形态可/.test(rep2.pendingText))
+  check('放射科内容带标签', rep2.radiologistLabels >= 1, `${rep2.radiologistLabels}`)
+  check('页脚免责声明', /非诊断结论/.test(rep2.disclaimer))
 
   // A second click must land in the same named window, not open another.
   await page.bringToFront()

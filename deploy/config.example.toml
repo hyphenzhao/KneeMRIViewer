@@ -22,6 +22,9 @@ name = "0826 膝关节软骨标注集"
 adapter = "ds0826"
 root = "/srv/mridata/0826"
 label_set = "knee_cartilage_0826_v1"
+# Hospital report workbook, one row per knee study keyed by the same integer as
+# the DICOM folder. CSV or XLSX. A file with a patient-name column is refused.
+# reports_file = "/srv/mridata/Refs/knee_MR_report.xlsx"
 
 [[datasets]]
 key = "changzheng"

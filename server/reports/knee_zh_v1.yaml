@@ -1,0 +1,147 @@
+# 膝关节 MRI 结构化报告模板
+#
+# 这个文件定义报告的固定框架：章节、顺序、每章的数据来源、占位语和禁用词。
+# 医生改这里就能改报告的结构和措辞，不需要改代码。
+#
+# 章节的 source 只能是以下之一：
+#   computed     —— 由本平台的算法计算（如软骨形态学）
+#   model        —— 由某个影像模型输出（接入后把 pending 改成 model，并填 model_key）
+#   radiologist  —— 直接引用放射科原始报告
+#   composed     —— 由其他章节的结果汇总而成（印象、建议）
+#   pending      —— 尚未接入数据来源：只显示占位语，**绝不**生成正文、绝不断言正常
+#
+# 章节顺序取自本院 157 份样例报告「影像描述」的固定套话顺序。
+# 印象按严重度优先排序，与样例的「诊断意见」一致。
+
+key: knee_zh_v1
+version: 1
+title_zh: 膝关节 MRI 结构化报告
+tail_sentence_zh: 请结合临床其他检查，随访。
+disclaimer_zh: 本报告由算法自动生成，非诊断结论，须由具备资质的医师结合原始图像复核后方可使用。
+
+# 任何由 AI 撰写的章节都不得出现的词（确定性诊断、影像学分期）。
+global_banned_terms: [确诊, KL分级, Kellgren]
+
+# 把放射科原始报告按句分配到章节的规则。
+radiologist_prefill:
+  sentence_split: "。"
+  # 88/157 行的「影像描述」与「诊断意见」完全相同——这种行只把诊断意见作为印象项引用。
+  copy_paste_rule: findings_equals_impression
+  label_zh: 放射科报告
+  note_zh: 来自放射科原始报告，非本平台计算结果
+
+chapters:
+  - id: overview
+    order: 0
+    section: findings
+    title_zh: 检查概况与数据质量
+    source: computed
+    ai_enabled: false
+    data_keys: [acquisition, quality, frame]
+    template_zh: >-
+      {laterality}矢状位 2D PD-FSE，层厚 {sliceThicknessMm} mm、面内 {inPlaneMm} mm；
+      骨-软骨界面可靠区面积占比 {reliableAreaPct}%，平均有效分辨率 {effectiveResolutionMm} mm。
+
+  - id: bone
+    order: 10
+    section: findings
+    title_zh: 骨皮质与骨髓信号
+    source: pending
+    model_key: bml_v1
+    placeholder_zh: 本次未评估（尚未接入相应模型）
+    prefill_regex: "骨皮质|骨质|骨髓|骨挫伤|骨岛|骨折|滑车"
+    ai_enabled: false
+
+  - id: cartilage
+    order: 20
+    section: findings
+    title_zh: 关节软骨
+    source: computed
+    ai_enabled: true
+    ai_prompt_file: knee_zh_v1.md
+    data_keys: [compartments, plates, subregions, grades, coverage, quality]
+    grade_scale: outerbridge_mri_thickness
+    prefill_regex: "软骨"
+    # 标签 1-8 推不出这些结构；软骨章的 AI 提到就是编造。
+    banned_terms: [半月板, 韧带, 交叉韧带, 前交叉, 后交叉, 侧副韧带, 骨髓水肿, 骨髓,
+                   积液, 滑膜炎, 囊肿, 腘窝囊肿, 撕裂, 骨折, 骨赘, 游离体, 滑膜, 肌腱, 髌腱]
+    caveats_zh:
+      - 厚度为层厚 3 mm 数据上的测量，绝对值系统性低估约 7-18%，不可直接与文献参考值比较；同一膝关节内外侧对比更可靠。
+      - 分级为厚度推导的 MRI 改良 Outerbridge，基线为本例同一软骨板可靠区中位数；I 级需信号信息，本方法不评估。
+
+  - id: effusion_synovium
+    order: 30
+    section: findings
+    title_zh: 关节积液与滑膜
+    source: pending
+    model_key: effusion_v1
+    placeholder_zh: 本次未评估（尚未接入相应模型）
+    prefill_regex: "积液|滑膜|髌上囊"
+    ai_enabled: false
+
+  - id: meniscus
+    order: 40
+    section: findings
+    title_zh: 半月板
+    source: pending
+    model_key: meniscus_v1
+    placeholder_zh: 本次未评估（尚未接入相应模型）
+    prefill_regex: "半月板"
+    allowed_terms: [半月板, 撕裂, 盘状]
+    banned_terms: [韧带, 软骨]
+    ai_enabled: false
+
+  - id: ligament_tendon
+    order: 50
+    section: findings
+    title_zh: 韧带与肌腱
+    subitems_zh: [髌韧带, 股四头肌腱, 前交叉韧带, 后交叉韧带, 内侧副韧带, 外侧副韧带]
+    source: pending
+    model_key: ligament_v1
+    placeholder_zh: 本次未评估（尚未接入相应模型）
+    prefill_regex: "韧带|肌腱|拉伤"
+    ai_enabled: false
+
+  - id: cyst
+    order: 60
+    section: findings
+    title_zh: 囊肿类病变
+    source: pending
+    placeholder_zh: 本次未评估（尚未接入相应模型）
+    prefill_regex: "囊肿|囊性|腘窝"
+    ai_enabled: false
+
+  - id: soft_tissue
+    order: 70
+    section: findings
+    title_zh: 周围软组织
+    source: pending
+    placeholder_zh: 本次未评估（尚未接入相应模型）
+    prefill_regex: "软组织|脂肪垫"
+    ai_enabled: false
+
+  - id: impression
+    order: 100
+    section: impression
+    title_zh: 印象
+    source: composed
+    severity_order: [grade_IV, grade_III, grade_II, asymmetry, thin_subregions, normal]
+    ai_enabled: false
+
+  - id: advice
+    order: 110
+    section: advice
+    title_zh: 建议
+    source: composed
+    ai_enabled: false
+    fixed_items_zh:
+      - 本结果为算法自动测量，须由医师结合原始图像复核后方可用于临床判断。
+      - 同一患者随访时请使用相同扫描协议，纵向变化的可靠性显著高于单次绝对值。
+
+  - id: quant_appendix
+    order: 200
+    section: appendix
+    title_zh: 定量附录
+    source: computed
+    ai_enabled: false
+    data_keys: [subregions, grades, coverage, histogram]

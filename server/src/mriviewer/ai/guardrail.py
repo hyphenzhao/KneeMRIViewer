@@ -99,9 +99,16 @@ def derived_numbers(payload: dict[str, Any]) -> list[float]:
     return out
 
 
-def check(report: dict[str, Any], payload: dict[str, Any]) -> GuardrailResult:
-    """Validate a model response against the numbers it was given."""
+def check(report: dict[str, Any], payload: dict[str, Any], *,
+          banned_terms: list[str] | None = None) -> GuardrailResult:
+    """Validate a model response against the numbers it was given.
+
+    ``banned_terms`` is per chapter: the cartilage chapter forbids 半月板, a
+    future meniscus chapter must not. The module default is the cartilage
+    list, which keeps the original single-report path unchanged.
+    """
     violations: list[str] = []
+    terms = BANNED_TERMS if banned_terms is None else list(banned_terms)
 
     missing = [s for s in REQUIRED_SECTIONS if not str(report.get(s) or "").strip()]
     if missing:
@@ -109,7 +116,7 @@ def check(report: dict[str, Any], payload: dict[str, Any]) -> GuardrailResult:
 
     prose = "\n".join(str(report.get(s) or "") for s in REQUIRED_SECTIONS)
 
-    banned_hits = sorted({t for t in BANNED_TERMS if t in prose})
+    banned_hits = sorted({t for t in terms if t in prose})
     if banned_hits:
         violations.append(
             "提到了标签 1-8 无法支持的结构: " + ", ".join(banned_hits))

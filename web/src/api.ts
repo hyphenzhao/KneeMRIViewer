@@ -313,6 +313,100 @@ export interface AiStatus {
   detail: string | null
 }
 
+export interface ReportOverrideMark {
+  id: string
+  original: unknown
+  editor: string | null
+  editedAt: string | null
+  reason: string | null
+  stale: boolean
+  noteZh: string | null
+}
+
+export interface ReportFact {
+  key: string; labelZh: string; value: unknown; unit: string; fmt: string
+  provenance: string
+  valueEffective?: unknown; override?: ReportOverrideMark | null
+}
+
+export interface ReportGrade {
+  key: string; labelZh: string | null; grade: string | null
+  confidence: string | null; lesionAreaMm2?: number | null
+  deficitPct?: number | null; baselineMm?: number | null
+  gradeEffective?: string | null; override?: ReportOverrideMark | null
+}
+
+export interface ReportItem {
+  id: string; text: string; severity: number
+  origin: 'computed' | 'radiologist' | 'template' | string
+  textEffective?: string; override?: ReportOverrideMark | null
+}
+
+export interface RenderedChapter {
+  id: string
+  order: number
+  section: 'findings' | 'impression' | 'advice' | 'appendix'
+  titleZh: string
+  source: string
+  status: 'ok' | 'pending' | 'failed'
+  prose: string | null
+  proseOrigin: 'llm' | 'template' | 'none'
+  proseEffective?: string | null
+  proseOverride?: ReportOverrideMark | null
+  facts: ReportFact[]
+  grades: ReportGrade[]
+  items: ReportItem[]
+  caveatsZh: string[]
+  placeholderZh: string | null
+  subitemsZh: string[]
+  radiologist: { labelZh: string; sentences: string[]; note: string } | null
+  sourceRef: { kind: string; id: number | null; status: string | null } | null
+}
+
+export interface ReportDocument {
+  id: number
+  segmentationId: number
+  generation: number
+  status: 'ok' | 'partial' | 'failed'
+  error: string | null
+  generatedAt: string
+  reviewState: string
+  reviewedBy: string | null
+  reviewedAt: string | null
+  header: {
+    titleZh?: string; disclaimerZh?: string; lateralityZh?: string | null
+    ageBand?: string | null; sexZh?: string | null; caseLabel?: string | null
+    seriesDescription?: string | null; generatedAt?: string
+    algoVersion?: string; templateKey?: string; templateVersion?: number
+  }
+  chapters: RenderedChapter[]
+  overrides: Array<{ id: string; target: { chapter: string; kind: string; key: string }
+    value: unknown; original: unknown; editor: string; editedAt: string
+    generation: number; stale: boolean; revokedAt: string | null }>
+  rendered: {
+    chapters: RenderedChapter[]
+    overrideCount: number
+    staleOverrideCount: number
+    reviewState: string | null
+    reviewedBy: string | null
+    reviewedAt: string | null
+    disclaimerZh: string | null
+    titleZh: string | null
+  }
+}
+
+export interface ReportDocumentState {
+  exists: boolean
+  id?: number
+  generation?: number
+  status?: string
+  reviewState?: string
+  generatedAt?: string
+  findingsChaptersWithData?: number
+  findingsChapters?: number
+  cartilageStale?: boolean
+}
+
 export const api = {
   datasets: () => json<DatasetSummary[]>('/datasets'),
 
@@ -348,6 +442,33 @@ export const api = {
     ),
   references: (key: string) => json<ReferenceSet>(`/references/${key}`),
   aiStatus: () => json<AiStatus>('/ai/status'),
+
+  reportTemplate: (key: string) => json<Record<string, unknown>>(`/report-templates/${key}`),
+  /** Absence is `exists: false`, never a 404. */
+  reportDocumentState: (segId: number) =>
+    json<ReportDocumentState>(`/segmentations/${segId}/report-document/state`),
+  reportDocument: (segId: number) => json<ReportDocument>(`/segmentations/${segId}/report-document`),
+  buildReportDocument: (segId: number, actor = '') =>
+    json<ReportDocument>(`/segmentations/${segId}/report-document`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actor }),
+    }),
+  setOverride: (docId: number, target: { chapter: string; kind: string; key: string },
+    value: unknown, editor: string, reason = '') =>
+    json<ReportDocument>(`/report-documents/${docId}/overrides`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target, value, editor, reason }),
+    }),
+  revokeOverride: (docId: number, overrideId: string, editor: string) =>
+    json<ReportDocument>(`/report-documents/${docId}/overrides/${overrideId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ revoke: true, editor }),
+    }),
+  reviewReportDocument: (docId: number, reviewState: string, reviewedBy: string) =>
+    json<ReportDocument>(`/report-documents/${docId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reviewState, reviewedBy }),
+    }),
   aiReport: (id: number) => json<AiReport>(`/segmentations/${id}/ai-report`),
   /** Absence is `exists: false`, not a 404 - "no report yet" is not an error. */
   aiReportState: (id: number) =>

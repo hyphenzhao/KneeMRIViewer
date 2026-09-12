@@ -117,6 +117,8 @@ def cmd_materialize(args) -> int:
 
 def cmd_mesh(args) -> int:
     from .seg.mesh import build_meshes_for_segmentation
+    if getattr(args, "terracing_report", False):
+        return _terracing_report(args)
     cfg = load_config(args.config)
     conn = connect(cfg.db_path)
     q = "SELECT id FROM segmentation WHERE seg_state='ready'"
@@ -243,6 +245,9 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=cmd_materialize)
 
     p = sub.add_parser("mesh", help="precompute 3D label surfaces")
+    p.add_argument("--terracing-report", action="store_true",
+                   help="print slice-facing area fraction, old vs new level set, "
+                        "for the chosen segmentations; builds nothing")
     p.add_argument("-g", "--segmentation")
     p.add_argument("--limit", type=int)
     p.add_argument("--force", action="store_true")
@@ -268,3 +273,59 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def _terracing_report(args) -> int:
+    """Old vs new display level set, measured rather than eyeballed.
+
+    Prints, per label, the fraction of surface area whose normal lies within
+    15 degrees of the slice axis. Terraces face the slice axis; a smooth
+    surface only does where the anatomy is genuinely flat.
+    """
+    import numpy as np
+
+    from .config import load_config
+    from .db.session import connect
+    from .seg.ingest import series_geometry
+    from .seg.mesh import (_choose_level_set, build_label_mesh,
+                           slice_facing_fraction)
+    from .volume.cache import VolumeCache
+
+    cfg = load_config(getattr(args, "config", None))
+    conn = connect(cfg.db_path, readonly=True)
+    q = "SELECT id FROM segmentation WHERE seg_state='ready'"
+    params: list = []
+    if args.segmentation:
+        q = "SELECT id FROM segmentation WHERE id=?"
+        params = [int(args.segmentation)]
+    elif args.limit:
+        q += " ORDER BY id LIMIT %d" % args.limit
+    ids = [int(r["id"]) for r in conn.execute(q, params).fetchall()]
+    cache = VolumeCache(cfg.cache_dir)
+    print("%6s %6s %10s %10s %8s  %s" % ("seg", "label", "antialias", "shape", "change", "auto->"))
+    for sid in ids:
+        row = conn.execute("SELECT * FROM segmentation WHERE id=?", (sid,)).fetchone()
+        if row is None or not row["seg_key"]:
+            continue
+        entry = cache.segmentation(row["seg_key"])
+        meta = entry.read_meta()
+        d = meta["dimensions"]
+        canonical = entry.read_array((d[2], d[1], d[0]), "uint8")
+        geom, _ = series_geometry(conn, int(row["series_id"]))
+        for value in meta.get("presentValues", []):
+            mask = canonical == value
+            old = build_label_mesh(mask, geom, level_set="antialias")
+            new = build_label_mesh(mask, geom, level_set="shape_interp")
+            if old is None or new is None:
+                continue
+            f_old = slice_facing_fraction(old[0], old[1], geom.normal)
+            f_new = slice_facing_fraction(new[0], new[1], geom.normal)
+            idx = np.argwhere(mask)
+            lo, hi = idx.min(0), idx.max(0) + 1
+            chosen = _choose_level_set(
+                np.ascontiguousarray(mask[lo[0]:hi[0], lo[1]:hi[1], lo[2]:hi[2]]),
+                (geom.spacing[2], geom.spacing[1], geom.spacing[0]))
+            print("%6d %6d %9.1f%% %9.1f%% %7.0f%%  %s" % (
+                sid, value, 100 * f_old, 100 * f_new,
+                100 * (f_new - f_old) / f_old if f_old else 0.0, chosen))
+    return 0

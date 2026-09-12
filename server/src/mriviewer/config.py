@@ -76,6 +76,9 @@ class Config:
     # Clinical reference values and metric wording. A file, not a table: doctors
     # edit it directly and every revision is a reviewable diff.
     refs_dir: Path = Path(__file__).resolve().parents[2] / "refs"
+    # Report chapter templates (YAML). Doctors edit these to change the
+    # report's structure and wording.
+    reports_dir: Path = Path(__file__).resolve().parents[2] / "reports"
     web_dir: Path | None = None
     predictions_roots: list[Path] = field(default_factory=list)
     scan_workers: int = 12
@@ -137,6 +140,8 @@ def load_config(path: str | os.PathLike | None = None) -> Config:
         cfg.labelsets_dir = Path(raw["labelsets_dir"]).expanduser()
     if "refs_dir" in raw:
         cfg.refs_dir = Path(raw["refs_dir"]).expanduser()
+    if "reports_dir" in raw:
+        cfg.reports_dir = Path(raw["reports_dir"]).expanduser()
     if "ai" in raw:
         a = raw["ai"]
         for name in ("enabled", "allow_egress", "base_url", "model", "timeout_s",
@@ -163,12 +168,14 @@ def load_config(path: str | os.PathLike | None = None) -> Config:
             label_set=d.get("label_set"),
             viewer=d.get("viewer", "mpr"),
             delivery_profile=d.get("delivery_profile", "native"),
-            reports_csv=d.get("reports_csv"),
+            # `reports_file` is the general name; `reports_csv` predates xlsx support.
+            reports_csv=d.get("reports_file") or d.get("reports_csv"),
             metadata_xlsx=d.get("metadata_xlsx"),
             enabled=d.get("enabled", True),
             extra={k: v for k, v in d.items() if k not in {
                 "key", "adapter", "root", "name", "label_set", "viewer",
-                "delivery_profile", "reports_csv", "metadata_xlsx", "enabled"}},
+                "delivery_profile", "reports_csv", "reports_file", "metadata_xlsx",
+                "enabled"}},
         ))
     cfg.config_path = Path(p)  # type: ignore[attr-defined]
     return cfg

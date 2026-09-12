@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react'
 
 import { api, type AiReport } from '../api'
+import { openReportWindow } from './SidebarKneeReport'
 
 const SOURCE: Record<string, { word: string; color: string; hint: string }> = {
   ok: { word: '模型生成', color: '#0ca30c', hint: '由语言模型撰写，已通过数值回溯校验' },
@@ -81,20 +82,16 @@ export default function SidebarReport({ segId }: { segId: number }) {
     }
   }
 
-  const openDetail = () => {
-    // Must be the hash URL: the backend serves the bundle through StaticFiles
-    // with no SPA fallback, so /metrics/8 would 404 on a fresh load.
-    // The window name makes repeated clicks reuse one popup.
-    const url = `${location.origin}${location.pathname}#/metrics/${segId}`
-    window.open(url, `mriv-metrics-${segId}`, 'width=1280,height=900')
-  }
+  // Both sidebar cards open the same unified document; this one lands on the
+  // cartilage chapter. The interactive dashboard is linked from that page.
+  const openDetail = () => openReportWindow(segId, 'cartilage')
 
   const src = report ? (SOURCE[report.status] ?? SOURCE.failed) : null
 
   return (
     <div className="sr">
       <div className="section-title">
-        诊断报告
+        软骨报告
         {src && (
           <span className="sr-badge" style={{ color: src.color }} title={src.hint}>
             ● {src.word}

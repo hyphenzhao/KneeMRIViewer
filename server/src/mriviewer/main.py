@@ -378,18 +378,30 @@ def labelmap_raw(seg_id: int) -> FileResponse:
 @app.get("/api/v1/segmentations/{seg_id}/meshes")
 def segmentation_meshes(seg_id: int) -> dict[str, Any]:
     _ensure_seg(seg_id)
+    from .seg.mesh import MESH_PIPELINE_VERSION
+    row = _seg_row(seg_id)
     rows = db().execute(
-        "SELECT label_value, n_points, n_tris, bytes FROM segmentation_mesh"
+        "SELECT label_value, n_points, n_tris, bytes, params_json FROM segmentation_mesh"
         " WHERE segmentation_id=? ORDER BY label_value", (seg_id,)).fetchall()
-    return {
-        "segmentationId": seg_id,
-        "state": _seg_row(seg_id)["mesh_state"],
-        "meshes": [
-            {**dict(r),
-             "url": "/api/v1/segmentations/%d/mesh/%d.bin" % (seg_id, r["label_value"])}
-            for r in rows
-        ],
-    }
+    # Only meshes the current pipeline wrote, and whose file is really there.
+    # Anything else is reported as absent so the client's "empty -> build" path
+    # rebuilds it, rather than showing a surface today's code would not produce.
+    current = []
+    for r in rows:
+        try:
+            params = json.loads(r["params_json"] or "{}")
+        except ValueError:
+            params = {}
+        if params.get("pipeline") != MESH_PIPELINE_VERSION:
+            continue
+        if row["seg_key"] and not cache().mesh_path(row["seg_key"], r["label_value"]).exists():
+            continue
+        current.append({
+            "label_value": r["label_value"], "n_points": r["n_points"],
+            "n_tris": r["n_tris"], "bytes": r["bytes"],
+            "url": "/api/v1/segmentations/%d/mesh/%d.bin" % (seg_id, r["label_value"]),
+        })
+    return {"segmentationId": seg_id, "state": row["mesh_state"], "meshes": current}
 
 
 @app.post("/api/v1/segmentations/{seg_id}/meshes/build")
@@ -610,6 +622,89 @@ def ai_report_review(report_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     rep = get_report(db(), int(row["segmentation_id"]))
     assert rep is not None
     return rep
+
+
+# ------------------------------------------------------ report documents
+
+@app.get("/api/v1/report-templates/{key}")
+def report_template(key: str) -> dict[str, Any]:
+    """The chapter skeleton, as JSON. Re-read from disk every call so a YAML
+    edit takes effect on save."""
+    from .report.template import load_template
+    try:
+        return load_template(cfg(), key).to_json()
+    except FileNotFoundError:
+        raise HTTPException(404, "template not found") from None
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/api/v1/segmentations/{seg_id}/report-document/state")
+def report_document_state(seg_id: int) -> dict[str, Any]:
+    from .report.document import document_state
+    _seg_row(seg_id)
+    return document_state(db(), seg_id)
+
+
+@app.get("/api/v1/segmentations/{seg_id}/report-document")
+def report_document_get(seg_id: int) -> dict[str, Any]:
+    from .report.document import get_document
+    _seg_row(seg_id)
+    doc = get_document(db(), seg_id)
+    if doc is None:
+        raise HTTPException(404, "no report document yet")
+    return doc
+
+
+@app.post("/api/v1/segmentations/{seg_id}/report-document")
+def report_document_build(seg_id: int, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Generate (or regenerate) the chaptered report. Replaces the prior one;
+    doctor overrides are carried forward and flagged stale."""
+    from .report.document import generate_document
+    _ensure_seg(seg_id)
+    actor = str((payload or {}).get("actor") or "")
+    with _lock_for("report:%d" % seg_id):
+        try:
+            return generate_document(db(), cfg(), seg_id, actor=actor)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+
+@app.post("/api/v1/report-documents/{doc_id}/overrides")
+def report_override_set(doc_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    from .report.document import set_override
+    try:
+        return set_override(db(), doc_id, dict(payload.get("target") or {}),
+                            payload.get("value"), str(payload.get("editor") or ""),
+                            str(payload.get("reason") or ""))
+    except KeyError:
+        raise HTTPException(404, "document not found") from None
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.patch("/api/v1/report-documents/{doc_id}/overrides/{override_id}")
+def report_override_revoke(doc_id: int, override_id: str,
+                           payload: dict[str, Any]) -> dict[str, Any]:
+    from .report.document import revoke_override
+    try:
+        return revoke_override(db(), doc_id, override_id, str(payload.get("editor") or ""))
+    except KeyError:
+        raise HTTPException(404, "document not found") from None
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.patch("/api/v1/report-documents/{doc_id}")
+def report_document_review(doc_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    from .report.document import review_document
+    try:
+        return review_document(db(), doc_id, str(payload.get("reviewState") or ""),
+                               str(payload.get("reviewedBy") or ""))
+    except KeyError:
+        raise HTTPException(404, "document not found") from None
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.get("/api/v1/references/{key}")

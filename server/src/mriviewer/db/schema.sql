@@ -237,3 +237,42 @@ CREATE TABLE IF NOT EXISTS ai_setting(
   updated_at TEXT DEFAULT (datetime('now')),
   updated_by TEXT
 );
+
+-- The unified, chaptered knee report. One row per segmentation, replaced on
+-- regenerate (same rule as ai_report). The cartilage chapter's LLM artifact
+-- stays in ai_report and is referenced from here. Doctor overrides live in
+-- overrides_json and survive regeneration, flagged stale.
+CREATE TABLE IF NOT EXISTS report_document(
+  id INTEGER PRIMARY KEY,
+  segmentation_id INTEGER NOT NULL REFERENCES segmentation(id) ON DELETE CASCADE,
+  morphometry_id INTEGER REFERENCES segmentation_morphometry(id),
+  ai_report_id INTEGER REFERENCES ai_report(id),
+  template_key TEXT NOT NULL,
+  template_hash TEXT,
+  generation INTEGER DEFAULT 1,
+  chapters_json TEXT NOT NULL,
+  overrides_json TEXT NOT NULL DEFAULT '[]',
+  header_json TEXT,
+  status TEXT,                -- ok | partial | failed
+  error TEXT,
+  generated_at TEXT DEFAULT (datetime('now')),
+  generated_by TEXT,
+  review_state TEXT DEFAULT 'unreviewed',   -- unreviewed | edited | approved | rejected
+  reviewed_by TEXT, reviewed_at TEXT,
+  signed_json TEXT            -- frozen rendered view at approval
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_report_document_seg ON report_document(segmentation_id);
+
+-- Append-only audit of every override set / revoke / auto-drop, so the
+-- "current" overrides_json never has to double as history.
+CREATE TABLE IF NOT EXISTS report_edit_log(
+  id INTEGER PRIMARY KEY,
+  document_id INTEGER NOT NULL REFERENCES report_document(id) ON DELETE CASCADE,
+  override_id TEXT NOT NULL,
+  action TEXT NOT NULL,       -- set | revoke | auto_drop
+  target TEXT NOT NULL,
+  original_json TEXT, value_json TEXT,
+  editor TEXT, reason TEXT, generation INTEGER,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS ix_report_edit_doc ON report_edit_log(document_id, id);
