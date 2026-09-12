@@ -14,7 +14,7 @@ DEST=${DEST:-$HOME/mri-viewer}
 SERVICE=${SERVICE:-mriviewer}
 
 # Never delete these from the destination - they are built or installed there.
-KEEP=(--exclude venv --exclude venv.new --exclude venv.old
+KEEP=(--exclude venv --exclude venv.new --exclude venv.old --exclude ms-playwright
       --exclude node_modules --exclude web/dist
       --exclude '__pycache__' --exclude '*.pyc' --exclude '.pytest_cache')
 

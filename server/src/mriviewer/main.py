@@ -401,7 +401,13 @@ def segmentation_meshes(seg_id: int) -> dict[str, Any]:
             "n_tris": r["n_tris"], "bytes": r["bytes"],
             "url": "/api/v1/segmentations/%d/mesh/%d.bin" % (seg_id, r["label_value"]),
         })
-    return {"segmentationId": seg_id, "state": row["mesh_state"], "meshes": current}
+    # Files written by an older pipeline are hidden above; if that leaves
+    # nothing to show, say "pending" so the state matches what is listed and
+    # the client rebuilds, rather than "ready" with an empty list.
+    state = row["mesh_state"]
+    if rows and not current and state == "ready":
+        state = "pending"
+    return {"segmentationId": seg_id, "state": state, "meshes": current}
 
 
 @app.post("/api/v1/segmentations/{seg_id}/meshes/build")
