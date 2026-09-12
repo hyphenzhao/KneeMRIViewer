@@ -154,7 +154,9 @@ try {
         size: `${c.width}x${c.height}`,
         sampled: total,
         nonBlackPct: Math.round((100 * nonBlack) / total),
-        colouredPct: Math.round((100 * coloured) / total),
+        // One decimal: only the cartilage is shown by default, and on a
+        // 3 mm-slice MPR that is around 1% of the pixels.
+        colouredPct: Math.round((1000 * coloured) / total) / 10,
         distinctColours: seen.size,
       })
     }
@@ -179,7 +181,7 @@ try {
   check('3 MPR viewports analysed', mpr.length === 3, `${mpr.length}`)
   for (const s of mpr) {
     check(`${s.tag}: drew image content`, s.nonBlackPct >= 5, `${s.nonBlackPct}% non-black`)
-    check(`${s.tag}: segmentation overlay visible`, s.colouredPct >= 1,
+    check(`${s.tag}: segmentation overlay visible`, s.colouredPct >= 0.3,
       `${s.colouredPct}% saturated pixels`)
   }
   if (v3d) {

@@ -26,6 +26,18 @@ import {
 } from './cs/viewer'
 import { setProgressReporter, type LoadPhase } from './cs/volumeLoader'
 
+/**
+ * What is shown when a segmentation opens: the cartilage plates only. The
+ * bones are the reference the cartilage sits on, and drawn by default they
+ * hide exactly the surfaces a reader opened the case to look at; one click
+ * in the label panel brings them back.
+ */
+function defaultVisible(s: LoadedSegmentation): Set<number> {
+  const bone = new Set(
+    (s.labelSet?.labels ?? []).filter((l) => l.group === 'bone').map((l) => l.value))
+  return new Set(s.presentValues.filter((v) => !bone.has(v)))
+}
+
 export default function App() {
   const [patient, setPatient] = useState<PatientDetail | null>(null)
   const [seriesRow, setSeriesRow] = useState<SeriesRow | null>(null)
@@ -98,7 +110,7 @@ export default function App() {
           // Set these together. An await between setSeg and setVisible would
           // let the surface effect run against the previous (empty) visibility
           // set and hide every 3D surface the moment it loaded.
-          const vis = new Set(s.presentValues)
+          const vis = defaultVisible(s)
           setSeg(s)
           setStats(s.stats)
           setVisible(vis)
@@ -222,7 +234,7 @@ export default function App() {
                   setStatus('切换分割版本…')
                   try {
                     const s = await loadSegmentation(id, loaded.volumeId)
-                    const vis = new Set(s.presentValues)
+                    const vis = defaultVisible(s)
                     setSeg(s)
                     setStats(s.stats)
                     setVisible(vis)
