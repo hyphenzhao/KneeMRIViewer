@@ -1,23 +1,28 @@
 /**
- * 诊断报告 - the AI report, in the reading sidebar under the label list.
+ * 诊断报告 - one card, one button, one document.
  *
- * Visually this deliberately imitates the existing 影像报告 block: the same
- * `.section-title` + `dl.report` markup the radiologist's report uses, so a
- * clinician reads it as the same kind of object rather than as a new widget.
- * The dashboard's `.mx-card` styling is not reused - it is scaled for a 1180px
- * column and looks wrong in 300px.
+ * The cartilage report, the knee chapters and the detailed document are not
+ * three things a reader has to assemble: they are one generation, run in
+ * order, and the card shows which step is running. There are exactly two
+ * buttons, and only once the report exists: 重新生成 and 查看详细报告.
  *
- * The report is cached server-side, one row per segmentation. Opening a case
- * that already has one costs nothing; only 重新生成 spends tokens, which is why
- * that is a separate, explicitly labelled button.
+ * Visually this imitates the 影像报告 block above it - the same
+ * `.section-title` + `dl.report` markup the radiologist's report uses - so a
+ * clinician reads it as the same kind of object rather than a new widget.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { api, type AiReport } from '../api'
-import { openReportWindow } from './SidebarKneeReport'
+import { api, type ReportDocument, type ReportDocumentState } from '../api'
+
+export function openReportWindow(segId: number, anchor?: string) {
+  // Hash URL on purpose: the backend serves the bundle with no SPA fallback,
+  // so /report/8 would 404 on a fresh load. One named window per case.
+  const url = `${location.origin}${location.pathname}#/report/${segId}${anchor ? '?to=' + anchor : ''}`
+  window.open(url, `mriv-report-${segId}`, 'width=1280,height=900')
+}
 
 const SOURCE: Record<string, { word: string; color: string; hint: string }> = {
-  ok: { word: '模型生成', color: '#0ca30c', hint: '由语言模型撰写，已通过数值回溯校验' },
+  ok: { word: '模型生成', color: '#0ca30c', hint: '软骨章由语言模型撰写，已通过数值与分级回溯校验' },
   fallback: {
     word: '内置模板', color: '#fab219',
     hint: '未调用语言模型（未启用或不可达），由固定模板按测量值确定性生成',
@@ -29,15 +34,8 @@ const SOURCE: Record<string, { word: string; color: string; hint: string }> = {
   failed: { word: '生成失败', color: '#d03b3b', hint: '生成过程出错' },
 }
 
-const SECTIONS: Array<[keyof AiReport, string]> = [
-  ['findings', '影像所见'],
-  ['quant', '定量测量'],
-  ['impression', '印象'],
-  ['advice', '建议'],
-]
-
-/** Turn the engine's exception text into something a clinician can act on. */
-function explainFailure(error: string): string {
+/** Turn an engine exception into something a clinician can act on. */
+function explain(error: string): string {
   if (/swapped|medial\/lateral/i.test(error)) {
     return '该病例的内侧/外侧软骨标签与影像中膝关节的实际位置不符，疑似标注时左右侧弄反了。'
       + '请先核对分割标签（4/6 应为内侧，5/7 应为外侧）后重新生成。'
@@ -46,52 +44,77 @@ function explainFailure(error: string): string {
   return error
 }
 
+/**
+ * One line per item, with the hospital sentences marked as such.
+ *
+ * The detailed report labels them as 放射科报告; this summary must too, or a
+ * reader here cannot tell a radiologist observation from our computation.
+ */
+function itemLines(items: Array<{ text: string; textEffective?: string; origin: string }>): string {
+  return items
+    .map((i) => (i.textEffective ?? i.text) + (i.origin === 'radiologist' ? '（放射科报告）' : ''))
+    .join('\n')
+}
+
+
 export default function SidebarReport({ segId }: { segId: number }) {
-  const [report, setReport] = useState<AiReport | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [state, setState] = useState<ReportDocumentState | null>(null)
+  const [doc, setDoc] = useState<ReportDocument | null>(null)
+  const [step, setStep] = useState<{ label: string; done: number; total: number } | null>(null)
   const [err, setErr] = useState('')
+  const alive = useRef(true)
 
   useEffect(() => {
-    let cancelled = false
-    setReport(null)
-    setErr('')
+    alive.current = true
+    setDoc(null); setState(null); setErr(''); setStep(null)
     ;(async () => {
       try {
-        // Ask whether one exists before fetching it, so the normal "not
-        // generated yet" case is not a 404 in the console.
-        const state = await api.aiReportState(segId)
-        if (cancelled || !state.exists) return
-        const r = await api.aiReport(segId)
-        if (!cancelled) setReport(r)
+        const st = await api.reportDocumentState(segId)
+        if (!alive.current) return
+        setState(st)
+        if (st.exists) {
+          const d = await api.reportDocument(segId)
+          if (alive.current) setDoc(d)
+        }
       } catch (e) {
-        if (!cancelled) setErr(String(e))
+        if (alive.current) setErr(String(e))
       }
     })()
-    return () => { cancelled = true }
+    return () => { alive.current = false }
   }, [segId])
 
   const generate = async () => {
-    setBusy(true)
     setErr('')
+    setStep({ label: '准备中', done: 0, total: 1 })
     try {
-      setReport(await api.buildAiReport(segId))
+      const d = await api.streamReportDocument(segId, '', (ev) => {
+        if (alive.current) setStep({ label: ev.labelZh, done: ev.done, total: ev.total })
+      })
+      if (!alive.current) return
+      setDoc(d)
+      setState(await api.reportDocumentState(segId))
     } catch (e) {
-      setErr(String(e))
+      if (alive.current) setErr(String(e))
     } finally {
-      setBusy(false)
+      if (alive.current) setStep(null)
     }
   }
 
-  // Both sidebar cards open the same unified document; this one lands on the
-  // cartilage chapter. The interactive dashboard is linked from that page.
-  const openDetail = () => openReportWindow(segId, 'cartilage')
-
-  const src = report ? (SOURCE[report.status] ?? SOURCE.failed) : null
+  const chapters = doc?.rendered.chapters ?? []
+  const byId = (id: string) => chapters.find((c) => c.id === id)
+  const cartilage = byId('cartilage')
+  const impression = byId('impression')
+  const advice = byId('advice')
+  const src = cartilage?.sourceRef?.status
+    ? (SOURCE[cartilage.sourceRef.status] ?? SOURCE.failed)
+    : null
+  const withData = state?.findingsChaptersWithData ?? 0
+  const totalFindings = state?.findingsChapters ?? 0
 
   return (
     <div className="sr">
       <div className="section-title">
-        软骨报告
+        诊断报告
         {src && (
           <span className="sr-badge" style={{ color: src.color }} title={src.hint}>
             ● {src.word}
@@ -99,45 +122,80 @@ export default function SidebarReport({ segId }: { segId: number }) {
         )}
       </div>
 
-      {err && <div className="err">{explainFailure(err)}</div>}
+      {err && <div className="err">{explain(err)}</div>}
 
-      {!report && !busy && !err && (
+      {!doc && !step && !err && (
         <div className="sr-intro">
-          <button className="sr-primary" onClick={generate}>生成软骨诊断报告</button>
+          <button className="sr-primary" onClick={generate}>生成诊断报告</button>
           <div className="sr-hint">
-            测量 22 个亚区的厚度、体积与内外侧对称性并撰写报告，首次约 30 秒。
+            依次完成：软骨形态学测量 → 软骨报告 → 膝关节各章节。首次约 40 秒，
             生成后会缓存，再次打开该病例不再消耗 token。
           </div>
         </div>
       )}
 
-      {busy && <div className="sr-intro"><div className="sr-hint">正在测量并撰写报告…</div></div>}
+      {step && (
+        <div className="sr-intro">
+          <div className="sr-progress">
+            <div className="sr-progress-bar"
+              style={{ width: `${Math.round((100 * step.done) / Math.max(step.total, 1))}%` }} />
+          </div>
+          <div className="sr-hint">
+            正在生成：{step.label}（{step.done}/{step.total}）
+          </div>
+        </div>
+      )}
 
-      {report && (
+      {doc && !step && (
         <>
           <dl className="report">
-            {SECTIONS.map(([key, title]) => {
-              const text = String(report[key] ?? '').trim()
-              if (!text) return null
-              return (
-                <div key={key} className="sr-row">
-                  <dt>{title}</dt>
-                  <dd>{text}</dd>
-                </div>
-              )
-            })}
+            {cartilage?.proseEffective && (
+              <div className="sr-row">
+                <dt>关节软骨</dt>
+                <dd>{cartilage.proseEffective}</dd>
+              </div>
+            )}
+            {impression && impression.items.length > 0 && (
+              <div className="sr-row">
+                <dt>印象</dt>
+                <dd>{itemLines(impression.items)}</dd>
+              </div>
+            )}
+            {advice && advice.items.length > 0 && (
+              <div className="sr-row">
+                <dt>建议</dt>
+                <dd>{itemLines(advice.items)}</dd>
+              </div>
+            )}
+            <div className="sr-row">
+              <dt>章节覆盖</dt>
+              <dd>
+                {withData} / {totalFindings} 个所见章节有数据来源，其余标注「未评估」，
+                等相应模型接入后自动填充。
+              </dd>
+            </div>
           </dl>
+
+          {doc.status === 'partial' && (
+            <div className="err">部分章节生成失败：{doc.error}</div>
+          )}
+          {state?.cartilageStale && (
+            <div className="sr-hint sr-warn">
+              软骨报告在本文档生成后被单独重新生成过，建议重新生成以保持一致。
+            </div>
+          )}
+
           <div className="sr-foot">
             <div className="sr-buttons">
-              <button onClick={generate} disabled={busy}
-                title="会重新调用模型并消耗 token，旧报告将被覆盖">
-                重新生成报告
+              <button onClick={generate}
+                title="会重新测量并重新调用模型，消耗 token；医师的修改会保留并标为需复核">
+                重新生成
               </button>
-              <button onClick={openDetail}>查看详细报告</button>
+              <button onClick={() => openReportWindow(segId)}>查看详细报告</button>
             </div>
             <div className="sr-hint">
-              {report.createdAt}
-              {report.version > 1 ? ` · 第 ${report.version} 次生成` : ''}
+              {doc.generatedAt}
+              {doc.generation > 1 ? ` · 第 ${doc.generation} 次生成` : ''}
               {' · '}本报告由算法生成，非诊断结论，须由医师复核
             </div>
           </div>

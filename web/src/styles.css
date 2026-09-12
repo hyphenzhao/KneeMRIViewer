@@ -519,3 +519,7 @@ body:has(.rp-root) { overflow: auto; }
 }
 .rp-btn { display: inline-block; font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 4px 10px; text-decoration: none; }
 .rp-btn:hover { border-color: var(--accent); }
+
+/* Generation progress in the sidebar: real steps, not an animation. */
+.sr-progress { height: 4px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
+.sr-progress-bar { height: 100%; background: var(--accent); transition: width .25s linear; }

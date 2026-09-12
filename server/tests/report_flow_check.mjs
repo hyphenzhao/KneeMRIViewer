@@ -89,39 +89,57 @@ try {
   check('侧栏有诊断报告区块', placement.report)
   const sections = await page.$$eval('.sidebar.right .sr .section-title',
     (els) => els.map((e) => e.textContent?.trim().replace(/●.*$/, '').trim()))
-  check('侧栏有「软骨报告」与「膝关节报告」两段', sections[0] === '软骨报告' && sections[1] === '膝关节报告',
-    sections.join('/'))
+  // One card, not one per report kind: the cartilage report, the knee chapters
+  // and the detailed document are one generation, so they get one entry.
+  check('侧栏只有一个报告区块', sections.length === 1 && sections[0] === '诊断报告', sections.join('/'))
   check('报告区块在分割标签之后', placement.after === true)
   check('旧的顶部入口已移除', placement.oldEntryGone === true)
 
-  // ---- 2. generate, and render like the radiologist report ----------------
-  const hadReport = await page.$('.sr:not(.sr-knee) dl.report')
+  // ---- 2. one button generates everything, with real progress ------------
+  const hadReport = await page.$('.sr dl.report')
   if (!hadReport) {
-    await page.click('.sr:not(.sr-knee) .sr-primary')
-    await page.waitForSelector('.sr:not(.sr-knee) dl.report', { timeout: 180000 })
+    const buttonsBefore = await page.$$eval('.sr button', (b) => b.length)
+    check('未生成时只有一个按钮', buttonsBefore === 1, `${buttonsBefore}`)
+    await page.click('.sr .sr-primary')
+    // Progress must come from the work: morphometry, then the model, then the
+    // chapters. Catch at least one chapter step going past.
+    const seen = new Set()
+    const stop = Date.now() + 240000
+    while (Date.now() < stop) {
+      const t = await page.evaluate(() => document.querySelector('.sr-progress') 
+        ? document.querySelector('.sr .sr-hint')?.textContent ?? '' : '')
+      if (!t) break
+      const m = /正在生成：(.+?)（(\d+)\/(\d+)）/.exec(t)
+      if (m) seen.add(m[1])
+      await sleep(300)
+    }
+    await page.waitForSelector('.sr dl.report', { timeout: 180000 })
+    check('进度按步骤推进（测量→模型→章节）', seen.size >= 3, [...seen].slice(0, 5).join('/'))
   }
   await sleep(1000)
 
   const card = await page.evaluate(() => {
-    const titles = [...document.querySelectorAll('.sr:not(.sr-knee) dl.report dt')].map((e) => e.textContent)
-    const dds = [...document.querySelectorAll('.sr:not(.sr-knee) dl.report dd')].map((e) => e.textContent ?? '')
+    const titles = [...document.querySelectorAll('.sr dl.report dt')].map((e) => e.textContent)
+    const dds = [...document.querySelectorAll('.sr dl.report dd')].map((e) => e.textContent ?? '')
     return {
       titles,
       shortest: Math.min(...dds.map((d) => d.trim().length)),
-      usesReportClass: !!document.querySelector('.sr:not(.sr-knee) dl.report'),
+      usesReportClass: !!document.querySelector('.sr dl.report'),
       badge: document.querySelector('.sr-badge')?.textContent?.trim() ?? '',
-      buttons: [...document.querySelectorAll('.sr:not(.sr-knee) .sr-buttons button')].map((b) => b.textContent?.trim()),
-      disclaim: document.querySelector('.sr:not(.sr-knee) .sr-foot .sr-hint')?.textContent ?? '',
+      buttons: [...document.querySelectorAll('.sr button')].map((b) => b.textContent?.trim()),
+      disclaim: document.querySelector('.sr .sr-foot .sr-hint')?.textContent ?? '',
     }
   })
-  check('四段齐全', JSON.stringify(card.titles) ===
-    JSON.stringify(['影像所见', '定量测量', '印象', '建议']), card.titles.join('/'))
+  check('卡片含软骨、印象、建议与章节覆盖',
+    card.titles.includes('关节软骨') && card.titles.includes('印象')
+    && card.titles.includes('建议') && card.titles.includes('章节覆盖'), card.titles.join('/'))
   check('每段都有内容', card.shortest > 10, `最短 ${card.shortest} 字`)
   check('复用影像报告的 dl.report 样式', card.usesReportClass)
   check('标注了生成来源', /模型生成|内置模板|模型被拒/.test(card.badge), card.badge)
-  check('两个按钮齐全', JSON.stringify(card.buttons) ===
-    JSON.stringify(['重新生成报告', '查看详细报告']), card.buttons.join('/'))
+  check('生成后整张卡片只有两个按钮', JSON.stringify(card.buttons) ===
+    JSON.stringify(['重新生成', '查看详细报告']), card.buttons.join('/'))
   check('注明非诊断结论', /非诊断结论/.test(card.disclaim))
+
 
   // ---- 3. 查看详细报告 opens a popup, and reuses it -----------------------
   const before = (await browser.targets()).length

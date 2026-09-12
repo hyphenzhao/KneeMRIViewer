@@ -10,7 +10,7 @@ import json
 import sqlite3
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Iterator
 
 from ..ai.payload import age_band
 from . import radiologist as rad
@@ -96,10 +96,33 @@ def document_state(conn: sqlite3.Connection, seg_id: int) -> dict[str, Any]:
 
 def generate_document(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
                       actor: str = "") -> dict[str, Any]:
+    """Generate the whole document. Drains the streaming generator below."""
+    doc = None
+    for event in iter_generate_document(conn, cfg, seg_id, actor=actor):
+        if "document" in event:
+            doc = event["document"]
+    assert doc is not None
+    return doc
+
+
+def iter_generate_document(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
+                           actor: str = "") -> Iterator[dict[str, Any]]:
+    """Generate the document, yielding a progress event before each step.
+
+    Progress is emitted from the work itself rather than animated on the
+    client: morphometry takes seconds, the cartilage model takes tens of
+    seconds, and the remaining chapters are near-instant. A reader watching
+    the list sees where the time actually goes.
+
+    The final event carries ``document``.
+    """
     from ..ai.service import generate_report, get_report
     from ..morph.service import compute_and_store
 
     tpl: ReportTemplate = load_template(cfg, TEMPLATE_KEY)
+    total = 2 + len(tpl.chapters)
+
+    yield {"stage": "morphometry", "labelZh": "测量软骨形态学", "done": 0, "total": total}
     morph = compute_and_store(conn, cfg, seg_id)
     if morph.get("state") != "ready":
         raise ValueError(morph.get("error") or "morphometry failed")
@@ -117,6 +140,7 @@ def generate_document(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
     errors: dict[str, str] = {}
     cart_spec = tpl.chapter("cartilage")
     ai_rep = None
+    yield {"stage": "cartilage_ai", "labelZh": "软骨报告（模型撰写）", "done": 1, "total": total}
     try:
         ai_rep = generate_report(conn, cfg, seg_id,
                                  banned_terms=tpl.banned_terms_for("cartilage"))
@@ -136,7 +160,11 @@ def generate_document(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
         errors=errors,
     )
 
-    chapters = [resolve(spec, ctx) for spec in tpl.chapters]
+    chapters = []
+    for i, spec in enumerate(tpl.chapters):
+        yield {"stage": "chapter", "chapter": spec.id, "labelZh": spec.title_zh,
+               "done": 2 + i, "total": total}
+        chapters.append(resolve(spec, ctx))
     failed = [c["id"] for c in chapters if c["status"] == "failed"]
     status = "partial" if failed else "ok"
 
@@ -180,7 +208,7 @@ def generate_document(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
     assert doc is not None
     for ov in dropped:
         _log(conn, doc["id"], ov, "auto_drop", editor="system", generation=generation)
-    return doc
+    yield {"stage": "done", "labelZh": "完成", "done": total, "total": total, "document": doc}
 
 
 def _carry_overrides(prev: dict[str, Any] | None, chapters: list[dict[str, Any]],

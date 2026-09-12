@@ -450,6 +450,47 @@ export const api = {
   reportDocumentState: (segId: number) =>
     json<ReportDocumentState>(`/segmentations/${segId}/report-document/state`),
   reportDocument: (segId: number) => json<ReportDocument>(`/segmentations/${segId}/report-document`),
+  /**
+   * Generate the document, reporting progress as it goes.
+   *
+   * Server-sent events over a POST, parsed by hand: the payload is a handful
+   * of small JSON objects, and EventSource cannot POST.
+   */
+  streamReportDocument: async (
+    segId: number, actor: string,
+    onProgress: (ev: { stage: string; labelZh: string; done: number; total: number }) => void,
+  ): Promise<ReportDocument> => {
+    const res = await fetch(`${BASE}/segmentations/${segId}/report-document/stream`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actor }),
+    })
+    if (!res.ok || !res.body) {
+      throw new Error(`${res.status} ${res.statusText} - ${(await res.text()).slice(0, 300)}`)
+    }
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let doc: ReportDocument | null = null
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      let cut
+      while ((cut = buffer.indexOf('\n\n')) >= 0) {
+        const frame = buffer.slice(0, cut)
+        buffer = buffer.slice(cut + 2)
+        const line = frame.split('\n').find((l) => l.startsWith('data:'))
+        if (!line) continue
+        const ev = JSON.parse(line.slice(5).trim())
+        if (ev.error) throw new Error(ev.error)
+        if (ev.document) doc = ev.document as ReportDocument
+        else onProgress(ev)
+      }
+    }
+    if (!doc) throw new Error('生成未完成：连接提前结束')
+    return doc
+  },
+
   buildReportDocument: (segId: number, actor = '') =>
     json<ReportDocument>(`/segmentations/${segId}/report-document`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

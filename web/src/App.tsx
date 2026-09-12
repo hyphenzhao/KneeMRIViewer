@@ -10,7 +10,6 @@ import {
 } from './api'
 import AiSettings from './components/AiSettings'
 import LabelPanel from './components/LabelPanel'
-import SidebarKneeReport from './components/SidebarKneeReport'
 import SidebarReport from './components/SidebarReport'
 import PatientList from './components/PatientList'
 import ViewerGrid from './components/ViewerGrid'
@@ -310,7 +309,6 @@ export default function App() {
             )}
 
             {seg && segId != null && <SidebarReport key={segId} segId={segId} />}
-            {seg && segId != null && <SidebarKneeReport key={'knee' + segId} segId={segId} />}
 
             {seriesRow?.geometry_warning && (
               <div className="err">几何提示：{seriesRow.geometry_warning}</div>

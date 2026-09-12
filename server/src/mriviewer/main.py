@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, ORJSONResponse
+from fastapi.responses import (FileResponse, JSONResponse, ORJSONResponse,
+                               StreamingResponse)
 from fastapi.staticfiles import StaticFiles
 
 from .config import Config, load_config
@@ -674,6 +675,33 @@ def report_document_build(seg_id: int, payload: dict[str, Any] | None = None) ->
             return generate_document(db(), cfg(), seg_id, actor=actor)
         except (KeyError, ValueError) as exc:
             raise HTTPException(409, str(exc)) from exc
+
+
+@app.post("/api/v1/segmentations/{seg_id}/report-document/stream")
+def report_document_stream(seg_id: int, payload: dict[str, Any] | None = None) -> StreamingResponse:
+    """Generate the document, streaming one progress event per step.
+
+    Server-sent events, so the sidebar can show which stage is running instead
+    of a spinner that says nothing. Errors arrive as a final `error` event -
+    the stream has already started, so the status code cannot carry them.
+    """
+    from .report.document import iter_generate_document
+    _ensure_seg(seg_id)
+    actor = str((payload or {}).get("actor") or "")
+
+    def events():
+        with _lock_for("report:%d" % seg_id):
+            try:
+                for ev in iter_generate_document(db(), cfg(), seg_id, actor=actor):
+                    yield "data: %s\n\n" % json.dumps(ev, ensure_ascii=False)
+            except Exception as exc:            # noqa: BLE001 - reported, not swallowed
+                yield "data: %s\n\n" % json.dumps(
+                    {"error": "%s: %s" % (type(exc).__name__, exc)}, ensure_ascii=False)
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-store",
+        "X-Accel-Buffering": "no",          # in case a proxy is ever put in front
+    })
 
 
 @app.post("/api/v1/report-documents/{doc_id}/overrides")
