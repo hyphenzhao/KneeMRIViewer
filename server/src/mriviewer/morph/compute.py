@@ -18,7 +18,7 @@ from .parcellation import SUBREGION_NAMES, parcellate
 from .probe import PLATES, RELIABLE_RES_MM, TAU_BONE_MM
 from .thickness import histogram, thickness_map, weighted_stats
 
-ALGO_VERSION = "morph-0.1.0"
+ALGO_VERSION = "morph-0.2.0"
 
 # A subregion needs at least this many native slices before its mean thickness
 # is reported without a low-confidence flag. Three is the minimum that can
@@ -40,11 +40,17 @@ class PlateResult:
     histogram: dict[str, Any]
     subregions: dict[str, Any] = field(default_factory=dict)
     qc: dict[str, Any] = field(default_factory=dict)
+    grading: dict[str, Any] = field(default_factory=dict)      # plate-level Outerbridge summary
+    lesions: list[dict[str, Any]] = field(default_factory=list)
+
+
+# bone label -> the cartilage plates that sit on it
+PLATES_OF_BONE = {1: [4, 5], 2: [6, 7], 3: [8]}
 
 
 def compute_morphometry(canonical: np.ndarray, geom,
                         header_laterality: str | None = None,
-                        *, strict: bool = True) -> dict[str, Any]:
+                        *, strict: bool = True, grading: Any = None) -> dict[str, Any]:
     """Full metric tree for one segmentation.
 
     Raises when the medial/lateral labels look swapped: a mirrored subregion
@@ -56,12 +62,40 @@ def compute_morphometry(canonical: np.ndarray, geom,
     if strict and not frame.medial_lateral_consistent:
         raise ValueError("; ".join(frame.notes) or "medial/lateral labels inconsistent")
 
+    from .coverage import bone_coverage
+    from .outerbridge import GradingParams
+
+    grading = grading or GradingParams()
     voxel_mm3 = float(np.prod(geom.spacing))
+
+    # Coverage once per bone, with all of that bone's plates together: dilating
+    # one plate's covered region on its own would march across the trochlea
+    # into the other plate.
+    coverage: dict[int, Any] = {}
+    for bone, carts in PLATES_OF_BONE.items():
+        present = [c for c in carts if c in masks]
+        if bone not in masks or not present:
+            continue
+        try:
+            fields, grid = iso_fields(masks, geom, [bone] + present)
+            cov = bone_coverage(fields, grid, geom, frame, bone, present,
+                                closing_radius_mm=grading.closing_radius_mm,
+                                min_denuded_area_mm2=grading.min_denuded_area_mm2,
+                                min_denuded_slices=grading.min_lesion_slices)
+        except Exception as exc:              # noqa: BLE001 - coverage is optional, grading IV is not
+            cov = None
+            frame.notes.append("coverage of bone %d failed: %s" % (bone, exc))
+        if cov is not None:
+            coverage[bone] = cov
+
     plates: list[PlateResult] = []
     for cart, (bone, name) in PLATES.items():
         if cart not in masks or bone not in masks:
             continue
-        result = _one_plate(masks, geom, frame, cart, bone, name, voxel_mm3)
+        cov = coverage.get(bone)
+        patches = [p for p in (cov.denuded if cov else []) if p.cart_label == cart]
+        result = _one_plate(masks, geom, frame, cart, bone, name, voxel_mm3,
+                            grading=grading, denuded_patches=patches)
         if result is not None:
             plates.append(result)
 
@@ -70,11 +104,17 @@ def compute_morphometry(canonical: np.ndarray, geom,
         "frame": frame.to_json(),
         "plates": [asdict(p) for p in plates],
         "compartments": _compartments(plates),
+        "coverage": {str(b): c.to_json() for b, c in coverage.items()},
+        "grading": {"scale": "outerbridge_mri_thickness", "params": grading.to_json(),
+                    "gradeIAssessable": False, "detectionFloorMm": float(geom.spacing[2])},
     }
 
 
 def _one_plate(masks, geom, frame: KneeFrame, cart: int, bone: int, name: str,
-               voxel_mm3: float) -> PlateResult | None:
+               voxel_mm3: float, *, grading: Any = None,
+               denuded_patches: list[Any] | None = None) -> PlateResult | None:
+    from .outerbridge import GradingParams, grade_plate
+    grading = grading or GradingParams()
     fields, grid = iso_fields(masks, geom, [cart, bone])
     surface = dense_surface(fields[cart])
     if surface is None:
@@ -119,6 +159,31 @@ def _one_plate(masks, geom, frame: KneeFrame, cart: int, bone: int, name: str,
                                       result.ray_vs_nn_median_ratio),
         }
 
+    # Faces of the interface only, re-indexed into the interface vertex set,
+    # so lesions are connected components on the bone-cartilage surface.
+    remap = np.full(len(verts), -1, int)
+    remap[np.flatnonzero(interface)] = np.arange(int(interface.sum()))
+    fi = remap[faces]
+    interface_faces = fi[(fi >= 0).all(axis=1)]
+
+    # Plate margin: interface vertices that share a face with a non-interface
+    # vertex. The plate tapers to nothing there by anatomy.
+    fi_any = (fi >= 0).any(axis=1) & ~(fi >= 0).all(axis=1)
+    boundary_full = np.zeros(len(verts), bool)
+    boundary_full[faces[fi_any].ravel()] = True
+    boundary = boundary_full[interface]
+
+    grades, lesions, grading_summary = grade_plate(
+        th=th, areas=areas, res_eff=res_eff, codes=parc.codes,
+        interface_verts_iso=verts[interface], interface_faces=interface_faces,
+        slice_index=slice_index, points_lps=points_lps,
+        denuded_patches=list(denuded_patches or []),
+        subregion_confidence={c: s["confidence"] for c, s in subregions.items()},
+        params=grading, boundary=boundary)
+    for code, g in grades.items():
+        if code in subregions:
+            subregions[code]["outerbridge"] = g
+
     reliable_all = float(areas[res_eff <= RELIABLE_RES_MM].sum() / areas.sum())
     return PlateResult(
         label=cart, name=name,
@@ -137,6 +202,8 @@ def _one_plate(masks, geom, frame: KneeFrame, cart: int, bone: int, name: str,
             "isoMm": grid.iso_mm,
             "notes": parc.notes,
         },
+        grading=grading_summary,
+        lesions=[l.to_json() for l in lesions],
     )
 
 

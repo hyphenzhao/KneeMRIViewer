@@ -62,6 +62,17 @@ def render_template_report(payload: dict[str, Any]) -> dict[str, Any]:
     if asym is not None:
         quant.append("内外侧不对称度 %+.1f%%。" % asym)
 
+    graded = [g for g in (payload.get("grades") or [])
+              if str(g.get("grade")) in ("II", "III", "IV")]
+    if graded:
+        quant.append(
+            "厚度推导的 Outerbridge 样分级（II 级及以上）：%s。"
+            % "、".join("%s %s 级" % (g.get("labelZh") or g.get("code"), g["grade"])
+                        for g in graded[:6]))
+    note = payload.get("gradingNote")
+    if note and payload.get("grades"):
+        quant.append(str(note).strip())
+
     thin = _notable_thin(subs)
     if thin:
         quant.append(

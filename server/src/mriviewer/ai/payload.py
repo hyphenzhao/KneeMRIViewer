@@ -119,6 +119,35 @@ def build_payload(morph: dict[str, Any], refs: dict[str, Any],
         "reliableAreaPct": round(100 * (p.get("qc") or {}).get("reliableAreaFraction", 0), 0),
     } for p in metrics.get("plates", [])]
 
+    # Grades and coverage are computed in Python; the model may only quote them.
+    grades = []
+    lesions = []
+    for plate in metrics.get("plates", []):
+        for code, sr in (plate.get("subregions") or {}).items():
+            ob = sr.get("outerbridge")
+            if not ob or code not in ALLOWED_SUBREGIONS:
+                continue
+            grades.append({
+                "code": code, "labelZh": sr.get("labelZh"), "plateZh": plate.get("name"),
+                "grade": ob.get("grade"), "confidence": ob.get("confidence"),
+                "lesionAreaMm2": ob.get("lesionAreaMm2"), "deficitPct": ob.get("deficitPct"),
+                "baselineMm": ob.get("baselineMm"), "nSlices": ob.get("nSlices"),
+            })
+        for l in plate.get("lesions") or []:
+            lesions.append({"plateZh": plate.get("name"), "code": l.get("code"),
+                            "grade": l.get("grade"), "areaMm2": l.get("area_mm2"),
+                            "deficitPct": l.get("median_deficit_pct"),
+                            "nSlices": l.get("n_slices")})
+    coverage = {}
+    for bone, cov in (metrics.get("coverage") or {}).items():
+        coverage[{"1": "femur", "2": "tibia", "3": "patella"}.get(str(bone), str(bone))] = {
+            "cABMm2": cov.get("cABMm2"), "tABMm2": cov.get("tABMm2"),
+            "dABInteriorPct": cov.get("dABInteriorPct"),
+            "denudedPatches": len(cov.get("denudedPatches") or []),
+        }
+    grading_note = ((refs.get("outerbridge") or {}).get("grading_note_zh")
+                    or "分级由厚度推导；I 级需信号信息，本方法不评估。")
+
     comp = metrics.get("compartments") or {}
     compartments = {
         side: {
@@ -152,6 +181,10 @@ def build_payload(morph: dict[str, Any], refs: dict[str, Any],
         "compartments": compartments,
         "plates": plates,
         "subregions": subregions,
+        "grades": grades,
+        "lesions": lesions,
+        "coverage": coverage,
+        "gradingNote": grading_note,
         "quality": {
             "reliableAreaPct": round(100 * (qc.get("reliableAreaFraction") or 0), 0),
             "effectiveResolutionMm": qc.get("effectiveResolutionMm"),

@@ -35,6 +35,12 @@ PCT_TOLERANCE = 1.01
 
 REQUIRED_SECTIONS = ("findings", "quant", "impression", "advice")
 
+# "II 级", "Outerbridge III级", "3级" - the ways a grade gets written. Roman
+# numerals I..IV and Arabic 0..4 both count.
+_GRADE = re.compile(r"(?:Outerbridge\s*)?\b(0|I{1,3}|IV|[1-4])\s*级")
+_ROMAN = {"0": "0", "I": "I", "II": "II", "III": "III", "IV": "IV",
+          "1": "I", "2": "II", "3": "III", "4": "IV"}
+
 # A leading '-' counts as a minus sign only when it is not between digits:
 # "60-69" and "7-18%" are ranges in our own wording, not negative numbers.
 _NUMBER = re.compile(r"(?<![\d.])(-?)(\d+(?:\.\d+)?)")
@@ -133,6 +139,8 @@ def check(report: dict[str, Any], payload: dict[str, Any], *,
     if bad_refs:
         violations.append("metricRefs 含未知亚区: " + ", ".join(map(str, bad_refs)))
 
+    violations += grade_violations(prose, payload)
+
     known = collect_numbers(payload) + derived_numbers(payload)
     unmatched = [n for n in _numbers_in(prose) if not _matches(n, known)]
     if unmatched:
@@ -143,6 +151,43 @@ def check(report: dict[str, Any], payload: dict[str, Any], *,
     return GuardrailResult(
         ok=not violations, violations=violations,
         unmatched_numbers=unmatched, banned_hits=banned_hits)
+
+
+def grade_violations(prose: str, payload: dict[str, Any]) -> list[str]:
+    """Every grade in the prose must be one Python assigned.
+
+    Three rules: no grades at all when the payload carries none; the set of
+    grades mentioned must be a subset of the payload's; and a grade written
+    next to a subregion name must be that subregion's grade. "I 级" is only
+    tolerated in the fixed grading note, never as a finding.
+    """
+    out: list[str] = []
+    # The fixed grading note names every grade by definition ("II 级为…"). A
+    # report quoting it is faithful, so it is removed before scanning.
+    note = str(payload.get("gradingNote") or "").strip()
+    if note:
+        prose = prose.replace(note, "")
+    mentioned = [_ROMAN.get(m.group(1), m.group(1)) for m in _GRADE.finditer(prose)]
+    if not mentioned:
+        return out
+    grades = payload.get("grades") or []
+    if not grades:
+        return ["提到了分级，但载荷中没有任何分级"]
+    allowed = {str(g.get("grade")) for g in grades} | {"0"}
+    for g in set(mentioned):
+        if g not in allowed:
+            out.append("正文出现了载荷中不存在的分级: %s 级" % g)
+    by_label = {}
+    for g in grades:
+        for key in (g.get("labelZh"), g.get("code")):
+            if key:
+                by_label[str(key)] = str(g.get("grade"))
+    for label, grade in by_label.items():
+        for m in re.finditer(re.escape(label) + r"[^。；;\n]{0,24}?" + _GRADE.pattern, prose):
+            said = _ROMAN.get(m.group(1), m.group(1))
+            if said != grade:
+                out.append("%s 的分级写成 %s 级，载荷为 %s 级" % (label, said, grade))
+    return out
 
 
 # Tokens that look like subregion codes; anything matching this shape but not

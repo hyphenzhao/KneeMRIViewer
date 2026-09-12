@@ -20,16 +20,19 @@ from .compute import (ALGO_VERSION, MIN_RELIABLE_AREA_FRACTION,
 from .parcellation import (CENTRAL_SPAN_FRACTION, PATELLA_FACET_SHIFT,
                            TIBIAL_CENTRAL_AREA_FRACTION,
                            TROCHLEA_SPAN_FRACTION)
+from .outerbridge import GradingParams, load_grading_params
 from .probe import RELIABLE_RES_MM, TAU_BONE_MM
 
 
-def current_params() -> dict[str, Any]:
+def current_params(grading: GradingParams | None = None) -> dict[str, Any]:
     """Every threshold that changes a number, in one place.
 
     Hashed into the cache key so that adjusting any of them yields a new row
-    rather than silently returning last week's figures.
+    rather than silently returning last week's figures. Grading thresholds
+    come from the reference YAML and are part of the key for the same reason.
     """
     return {
+        "outerbridge": (grading or GradingParams()).to_json(),
         "reliableResMm": RELIABLE_RES_MM,
         "tauBoneMm": TAU_BONE_MM,
         "trochleaSpanFraction": TROCHLEA_SPAN_FRACTION,
@@ -47,12 +50,25 @@ def params_hash(params: dict[str, Any]) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 
-def get_morphometry(conn: sqlite3.Connection, seg_id: int) -> dict[str, Any] | None:
+def grading_params(cfg: Any) -> GradingParams:
+    """Thresholds from the reference YAML (the file doctors edit)."""
+    try:
+        import yaml
+        refs = yaml.safe_load((cfg.refs_dir / "knee_cartilage_reference_v1.yaml")
+                              .read_text(encoding="utf-8"))
+    except (OSError, AttributeError):
+        refs = None
+    return load_grading_params(refs)
+
+
+def get_morphometry(conn: sqlite3.Connection, seg_id: int,
+                    cfg: Any = None) -> dict[str, Any] | None:
     """The stored result for the current algorithm and thresholds, if any."""
+    params = current_params(grading_params(cfg) if cfg is not None else None)
     row = conn.execute(
         "SELECT * FROM segmentation_morphometry"
         " WHERE segmentation_id=? AND algo_version=? AND params_hash=?",
-        (seg_id, ALGO_VERSION, params_hash(current_params()))).fetchone()
+        (seg_id, ALGO_VERSION, params_hash(params))).fetchone()
     return _row_to_json(row) if row else None
 
 
@@ -81,11 +97,12 @@ def compute_and_store(conn: sqlite3.Connection, cfg: Any, seg_id: int,
     too - a knee whose medial and lateral labels are swapped must keep saying
     so on every request, not silently retry and burn 7 seconds each time.
     """
-    params = current_params()
+    grading = grading_params(cfg)
+    params = current_params(grading)
     p_hash = params_hash(params)
 
     if not force:
-        existing = get_morphometry(conn, seg_id)
+        existing = get_morphometry(conn, seg_id, cfg)
         if existing is not None:
             return existing
 
@@ -104,7 +121,7 @@ def compute_and_store(conn: sqlite3.Connection, cfg: Any, seg_id: int,
     started = time.perf_counter()
     state, error, result = "ready", None, None
     try:
-        result = _run(conn, cfg, seg)
+        result = _run(conn, cfg, seg, grading)
     except Exception as exc:                      # noqa: BLE001
         state, error = "failed", "%s: %s" % (type(exc).__name__, exc)
 
@@ -126,12 +143,13 @@ def compute_and_store(conn: sqlite3.Connection, cfg: Any, seg_id: int,
          state, error, duration_ms))
     conn.commit()
 
-    stored = get_morphometry(conn, seg_id)
+    stored = get_morphometry(conn, seg_id, cfg)
     assert stored is not None
     return stored
 
 
-def _run(conn: sqlite3.Connection, cfg: Any, seg: sqlite3.Row) -> dict[str, Any]:
+def _run(conn: sqlite3.Connection, cfg: Any, seg: sqlite3.Row,
+         grading: GradingParams) -> dict[str, Any]:
     from ..seg.ingest import series_geometry
 
     entry = VolumeCache(cfg.cache_dir).segmentation(seg["seg_key"])
@@ -142,11 +160,12 @@ def _run(conn: sqlite3.Connection, cfg: Any, seg: sqlite3.Row) -> dict[str, Any]
     canonical = entry.read_array((slices, rows, cols), meta["numpyDtype"])
 
     geom, _ = series_geometry(conn, int(seg["series_id"]))
-    tree = compute_morphometry(canonical, geom, seg["laterality"])
+    tree = compute_morphometry(canonical, geom, seg["laterality"], grading=grading)
 
     return {
         "frame": tree["frame"],
-        "metrics": {"plates": tree["plates"], "compartments": tree["compartments"]},
+        "metrics": {"plates": tree["plates"], "compartments": tree["compartments"],
+                    "coverage": tree.get("coverage", {}), "grading": tree.get("grading", {})},
         "qc": _overall_qc(tree),
     }
 
