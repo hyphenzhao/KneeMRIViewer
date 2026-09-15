@@ -366,6 +366,8 @@ export interface ReportItem {
 export interface RenderedChapter {
   id: string
   order: number
+  /** The grades this chapter accepts, recorded when it was generated. */
+  gradeValues?: string[]
   section: 'findings' | 'impression' | 'advice' | 'appendix'
   titleZh: string
   source: string

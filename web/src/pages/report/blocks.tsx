@@ -14,7 +14,13 @@ export type OverrideFn = (t: { chapter: string; kind: string; key: string }, v: 
 export type Sex = 'male' | 'female'
 
 export const GRADE_ZH: Record<string, string> = {
-  '0': '0 级', II: 'II 级', III: 'III 级', IV: 'IV 级', 未评估: '未评估',
+  '0': '0 级', I: 'I 级', II: 'II 级', III: 'III 级', IV: 'IV 级',
+  未评估: '未评估', 有: '有', 无: '无',
+}
+const DEFAULT_GRADES = ['0', 'II', 'III', 'IV', '未评估']
+/** A chapter's own grade vocabulary: Outerbridge is only the cartilage one. */
+export function gradeChoices(c: RenderedChapter): string[] {
+  return c.gradeValues?.length ? c.gradeValues : DEFAULT_GRADES
 }
 export const CONF = {
   high: { glyph: '●', word: '可信' },
@@ -60,8 +66,11 @@ export function Mark({ o }: { o: RenderedChapter['proseOverride'] }) {
 }
 
 export function StatusBadge({ c }: { c: RenderedChapter }) {
+  // Provenance, not decoration: a chapter written by the language model, one
+  // measured by our own algorithm, and one read off a third-party model's
+  // segmentation are three different claims and must not share a word.
   const zh: Record<string, string> = {
-    ok: c.proseOrigin === 'llm' ? '模型解读' : '算法生成',
+    ok: c.proseOrigin === 'llm' ? '模型解读' : c.source === 'model' ? '模型分割' : '算法生成',
     pending: '未评估', failed: '生成失败',
   }
   return <span className={`rp-badge rp-badge-${c.status}`}>{zh[c.status] ?? c.status}</span>
@@ -146,7 +155,7 @@ export function gradeTable(c: RenderedChapter, editing: boolean, onOverride: Ove
         {editing && (
           <td>
             <select value={e} onChange={(ev) => onOverride({ chapter: c.id, kind: 'grade', key: g.key }, ev.target.value)}>
-              {['0', 'II', 'III', 'IV', '未评估'].map((v) => <option key={v} value={v}>{GRADE_ZH[v]}</option>)}
+              {gradeChoices(c).map((v) => <option key={v} value={v}>{GRADE_ZH[v] ?? v}</option>)}
             </select>
             {g.override && <button className="rp-mini" onClick={() => onRevoke(g.override!.id)}>撤销</button>}
           </td>

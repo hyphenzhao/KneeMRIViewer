@@ -106,36 +106,42 @@ def derived_numbers(payload: dict[str, Any]) -> list[float]:
 
 
 def check(report: dict[str, Any], payload: dict[str, Any], *,
-          banned_terms: list[str] | None = None) -> GuardrailResult:
+          banned_terms: list[str] | None = None,
+          allowed_codes: set[str] | None = None,
+          required_sections: tuple[str, ...] | None = None) -> GuardrailResult:
     """Validate a model response against the numbers it was given.
 
-    ``banned_terms`` is per chapter: the cartilage chapter forbids 半月板, a
-    future meniscus chapter must not. The module default is the cartilage
-    list, which keeps the original single-report path unchanged.
+    Every vocabulary this checks against is per chapter, because the cartilage
+    chapter's vocabulary is wrong for every other structure: the cartilage
+    chapter forbids 半月板 and knows 22 subregion codes, a meniscus chapter
+    must allow the word and knows none of the codes. Each argument defaults to
+    the cartilage list, which keeps the original single-report path unchanged.
     """
     violations: list[str] = []
     terms = BANNED_TERMS if banned_terms is None else list(banned_terms)
+    codes = ALLOWED_SUBREGIONS if allowed_codes is None else set(allowed_codes)
+    sections = REQUIRED_SECTIONS if required_sections is None else tuple(required_sections)
 
-    missing = [s for s in REQUIRED_SECTIONS if not str(report.get(s) or "").strip()]
+    missing = [s for s in sections if not str(report.get(s) or "").strip()]
     if missing:
         violations.append("缺少必需段落: " + ", ".join(missing))
 
-    prose = "\n".join(str(report.get(s) or "") for s in REQUIRED_SECTIONS)
+    prose = "\n".join(str(report.get(s) or "") for s in sections)
 
     banned_hits = sorted({t for t in terms if t in prose})
     if banned_hits:
         violations.append(
-            "提到了标签 1-8 无法支持的结构: " + ", ".join(banned_hits))
+            "提到了本章的数据无法支持的结构: " + ", ".join(banned_hits))
 
     # Subregion codes must be ones we actually measure.
     bad_codes = sorted({
         c for c in re.findall(r"\b(?:[a-z]{1,2})?[A-Z]{1,3}[A-Za-z]?\b", prose)
-        if c in _CODE_LOOKALIKES and c not in ALLOWED_SUBREGIONS})
+        if c in _CODE_LOOKALIKES and c not in codes})
     if bad_codes:
         violations.append("使用了未定义的亚区代码: " + ", ".join(bad_codes))
 
     refs = report.get("metricRefs") or []
-    bad_refs = [r for r in refs if r not in ALLOWED_SUBREGIONS]
+    bad_refs = [r for r in refs if r not in codes]
     if bad_refs:
         violations.append("metricRefs 含未知亚区: " + ", ".join(map(str, bad_refs)))
 

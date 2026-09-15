@@ -28,6 +28,13 @@ class GenContext:
     sex_zh: str | None
     age_band: str | None
     errors: dict[str, str] = field(default_factory=dict)
+    # chapter id -> what a model left behind for this series, if anything.
+    # See scan/predictions.py and document.py::_structures.
+    structures: dict[str, Any] = field(default_factory=dict)
+    # Chapters already resolved this run, by id. Chapters are resolved in
+    # template order, so `composed` ones (impression, advice, order 100+) can
+    # collect from the findings chapters above them.
+    resolved: dict[str, Any] = field(default_factory=dict)
 
 
 def _base(spec: ChapterSpec, status: str = "ok") -> dict[str, Any]:
@@ -122,6 +129,52 @@ def computed_cartilage(spec: ChapterSpec, ctx: GenContext) -> dict[str, Any]:
     return ch
 
 
+def model_structures(spec: ChapterSpec, ctx: GenContext) -> dict[str, Any]:
+    """A chapter fed by a segmentation model's output.
+
+    The platform does not run the model. It reads what the model left for this
+    series (``scan/predictions.py``), and says only what a labelmap can
+    support: which structures were segmented, how large each is, how many
+    native slices it spans. No tear, no grade, no signal - those need either a
+    different model or a rule we have validated, and until then this chapter
+    must not imply them.
+
+    No output for this chapter's label set means the chapter stays **pending**.
+    An empty section would read as "normal", which is the one thing it must
+    never read as.
+    """
+    found = (ctx.structures or {}).get(spec.id)
+    if not found or not found.get("labels"):
+        return pending(spec, ctx)
+
+    ch = _base(spec)
+    labels = found["labels"]
+    for lab in labels:
+        code = lab.get("nameEn") or str(lab["value"])
+        name = lab.get("nameZh") or code
+        ch["facts"].append(_fact("model.%s.volumeCm3" % code, name + "体积",
+                                 lab.get("volumeCm3"), "cm³", ".2f", "model"))
+        ch["facts"].append(_fact("model.%s.slices" % code, name + "跨越层数",
+                                 lab.get("nSlices"), "层", ".0f", "model"))
+
+    names = "、".join(lab.get("nameZh") or str(lab["value"]) for lab in labels)
+    sizes = "；".join(
+        "%s %.2f cm³、跨 %d 个原始层" % (lab.get("nameZh") or lab["value"],
+                                        lab.get("volumeCm3") or 0.0, lab.get("nSlices") or 0)
+        for lab in labels)
+    tpl = spec.template_zh or "本次由模型分割出{names}。{sizes}。本章为分割所得的形态学测量，未评估信号、撕裂或退变。"
+    ch["prose"] = tpl.format(names=names, sizes=sizes,
+                             model=found.get("model") or "", version=found.get("version") or "")
+    ch["proseOrigin"] = "template"
+    ch["caveatsZh"] = list(ch["caveatsZh"]) + [
+        "本章结构由模型「%s %s」自动分割，未在本院本序列上验证，须由医师对照原始图像复核。"
+        % (found.get("model") or "?", found.get("version") or "?")]
+    ch["sourceRef"] = {"kind": "segmentation", "id": found.get("segmentationId"),
+                       "status": found.get("state")}
+    ch["radiologist"] = _radiologist_block(spec, ctx)
+    return ch
+
+
 def pending(spec: ChapterSpec, ctx: GenContext) -> dict[str, Any]:
     """No data source yet. Placeholder only - never a sentence about the anatomy."""
     ch = _base(spec, status="pending")
@@ -131,6 +184,10 @@ def pending(spec: ChapterSpec, ctx: GenContext) -> dict[str, Any]:
 
 
 def _severity_of(text: str) -> int:
+    # A torn structure outranks a thin one. Without this line a meniscal tear
+    # scored 1 and sorted below "软骨变薄" in the impression.
+    if any(w in text for w in ("撕裂", "断裂", "骨折")):
+        return 5
     if any(w in text for w in ("IV 级", "IV级", "裸露")):
         return 5
     if any(w in text for w in ("III 级", "III级")):
@@ -210,6 +267,7 @@ SOURCES: dict[str, Callable[[ChapterSpec, GenContext], dict[str, Any]]] = {
     "computed:quant_appendix": computed_appendix,
     "composed:impression": composed_impression,
     "composed:advice": composed_advice,
+    "model": model_structures,
     "pending": pending,
 }
 

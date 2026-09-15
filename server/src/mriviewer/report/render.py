@@ -78,7 +78,7 @@ def find_target(chapters: list[dict[str, Any]], target: dict[str, Any]) -> dict[
             continue
         if kind == "prose":
             return {"value": ch.get("prose"), "exists": ch.get("prose") is not None
-                    or ch.get("source") in ("computed", "composed")}
+                    or ch.get("source") in ("computed", "composed", "model")}
         coll = {"fact": "facts", "grade": "grades", "item": "items"}.get(kind)
         if not coll:
             return None

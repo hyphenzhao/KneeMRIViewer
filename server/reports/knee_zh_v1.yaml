@@ -83,8 +83,13 @@ chapters:
     order: 40
     section: findings
     title_zh: 半月板
-    source: pending
+    # 已接线但未必有数据：模型往 predictions_roots 里写出 knee_meniscus_v1 标签图
+    # 的病例才会有正文，没有的病例仍然只显示下面的占位语。
+    source: model
     model_key: meniscus_v1
+    model_label_set: knee_meniscus_v1
+    grade_scale: stoller
+    template_zh: "本次由模型分割出{names}。{sizes}。本章为分割所得的形态学测量，未评估信号、撕裂或退变。"
     placeholder_zh: 本次未评估（尚未接入相应模型）
     prefill_regex: "半月板"
     allowed_terms: [半月板, 撕裂, 盘状]

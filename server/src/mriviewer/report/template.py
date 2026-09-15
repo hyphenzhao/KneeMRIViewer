@@ -13,6 +13,17 @@ from pathlib import Path
 from typing import Any
 
 SOURCES = ("computed", "model", "radiologist", "manual", "pending", "composed")
+# What a grade may be, per scale. A chapter names one with `grade_scale`; the
+# doctor's edit dropdown and the override validator both read it, so a new
+# structure cannot end up with its grades silently validated against
+# Outerbridge's vocabulary.
+GRADE_SCALES: dict[str, tuple[str, ...]] = {
+    "outerbridge_mri_thickness": ("0", "II", "III", "IV", "未评估"),
+    "stoller": ("0", "I", "II", "III", "未评估"),
+    "presence": ("有", "无", "未评估"),
+}
+DEFAULT_GRADE_SCALE = "outerbridge_mri_thickness"
+
 SECTIONS = ("findings", "impression", "advice", "appendix")
 
 
@@ -37,12 +48,25 @@ class ChapterSpec:
     severity_order: list[str] = field(default_factory=list)
     fixed_items_zh: list[str] = field(default_factory=list)
     grade_scale: str | None = None
+    # Which label set a `source: model` chapter is fed by. The model writes a
+    # labelmap under that key (see scan/predictions.py); this is the join.
+    model_label_set: str | None = None
+
+    @property
+    def grade_values(self) -> tuple[str, ...]:
+        """The grades a doctor may choose for this chapter.
+
+        Outerbridge unless the chapter says otherwise, so every existing
+        chapter keeps the vocabulary it already had.
+        """
+        return GRADE_SCALES[self.grade_scale or DEFAULT_GRADE_SCALE]
 
     def to_json(self) -> dict[str, Any]:
         return {
             "id": self.id, "order": self.order, "section": self.section,
             "titleZh": self.title_zh, "source": self.source,
             "aiEnabled": self.ai_enabled, "modelKey": self.model_key,
+            "modelLabelSet": self.model_label_set, "gradeValues": list(self.grade_values),
             "placeholderZh": self.placeholder_zh, "subitemsZh": self.subitems_zh,
             "caveatsZh": self.caveats_zh, "gradeScale": self.grade_scale,
         }
@@ -102,6 +126,7 @@ def load_template(cfg: Any, key: str = "knee_zh_v1") -> ReportTemplate:
             title_zh=str(c["title_zh"]), source=str(c["source"]),
             ai_enabled=bool(c.get("ai_enabled", False)),
             ai_prompt_file=c.get("ai_prompt_file"), model_key=c.get("model_key"),
+            model_label_set=c.get("model_label_set"),
             data_keys=list(c.get("data_keys") or []),
             template_zh=c.get("template_zh"), placeholder_zh=c.get("placeholder_zh"),
             prefill_regex=c.get("prefill_regex"),
@@ -121,6 +146,11 @@ def load_template(cfg: Any, key: str = "knee_zh_v1") -> ReportTemplate:
             raise ValueError("chapter %s: unknown section %r" % (spec.id, spec.section))
         if spec.ai_enabled and not spec.ai_prompt_file:
             raise ValueError("chapter %s: ai_enabled needs ai_prompt_file" % spec.id)
+        if spec.grade_scale and spec.grade_scale not in GRADE_SCALES:
+            raise ValueError("chapter %r: unknown grade_scale %r (known: %s)"
+                             % (spec.id, spec.grade_scale, ", ".join(sorted(GRADE_SCALES))))
+        if spec.source == "model" and not spec.model_label_set:
+            raise ValueError("chapter %r: source 'model' needs model_label_set" % spec.id)
         if spec.source == "pending" and not spec.placeholder_zh:
             raise ValueError("chapter %s: pending chapters need placeholder_zh" % spec.id)
         seen.add(spec.id)

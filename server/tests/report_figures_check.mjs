@@ -97,7 +97,7 @@ try {
       figTitles: [...document.querySelectorAll('[data-chapter="cartilage"] .rp-fig-title')].map((e) => e.textContent.slice(0, 4)),
       caveatBeforeNumbers: !!(caveat && firstNum && (caveat.compareDocumentPosition(firstNum) & 4)),
       chapterHeadings: [...document.querySelectorAll('.rp-chapter h3, .rp-chapter h2')].slice(0, 3)
-        .map((e) => e.textContent.replace(/\s+/g, '').replace(/(算法生成|模型解读|未评估|生成失败)$/, '')),
+        .map((e) => e.textContent.replace(/\s+/g, '').replace(/(算法生成|模型解读|模型分割|未评估|生成失败)$/, '')),
       h2h3InFigures: document.querySelectorAll('.rp-fig h2, .rp-fig h3').length,
       figuresTotal: Number(document.querySelector('.rp-root').dataset.figuresTotal),
       figuresSkipped: document.querySelector('.rp-root').dataset.figuresSkipped,

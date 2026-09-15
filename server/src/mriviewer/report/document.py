@@ -19,7 +19,6 @@ from .sources import GenContext, resolve
 from .template import ReportTemplate, load_template
 
 TEMPLATE_KEY = "knee_zh_v1"
-GRADE_VALUES = ("0", "II", "III", "IV", "未评估")
 
 
 def _now() -> str:
@@ -120,7 +119,7 @@ def iter_generate_document(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
     from ..morph.service import compute_and_store
 
     tpl: ReportTemplate = load_template(cfg, TEMPLATE_KEY)
-    total = 3 + len(tpl.chapters)
+    total = 4 + len(tpl.chapters)
 
     yield {"stage": "morphometry", "labelZh": "测量软骨形态学", "done": 0, "total": total}
     morph = compute_and_store(conn, cfg, seg_id)
@@ -148,7 +147,17 @@ def iter_generate_document(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
     except Exception as exc:                      # noqa: BLE001 - a report without 3D is still a report
         errors["mesh"] = "%s: %s" % (type(exc).__name__, exc)
 
-    yield {"stage": "cartilage_ai", "labelZh": "软骨报告（模型撰写）", "done": 2, "total": total}
+    # Whatever a structure model left for this series. Materialising each one
+    # runs the same grid check ground truth goes through, so a prediction that
+    # is not on this series' grid is refused here rather than drawn.
+    yield {"stage": "structures", "labelZh": "其他结构（模型分割）", "done": 2, "total": total}
+    structures: dict[str, Any] = {}
+    try:
+        structures = _structures(conn, cfg, seg_id, tpl)
+    except Exception as exc:                      # noqa: BLE001 - optional, never fatal
+        errors["structures"] = "%s: %s" % (type(exc).__name__, exc)
+
+    yield {"stage": "cartilage_ai", "labelZh": "软骨报告（模型撰写）", "done": 3, "total": total}
     try:
         ai_rep = generate_report(conn, cfg, seg_id,
                                  banned_terms=tpl.banned_terms_for("cartilage"))
@@ -165,14 +174,19 @@ def iter_generate_document(conn: sqlite3.Connection, cfg: Any, seg_id: int, *,
         radiologist=rad.prefill(report_row, tpl),
         laterality=laterality, sex_zh=sex_zh,
         age_band=age_band(meta["age"]) if meta else None,
-        errors=errors,
+        errors=errors, structures=structures,
     )
 
     chapters = []
     for i, spec in enumerate(tpl.chapters):
         yield {"stage": "chapter", "chapter": spec.id, "labelZh": spec.title_zh,
-               "done": 3 + i, "total": total}
-        chapters.append(resolve(spec, ctx))
+               "done": 4 + i, "total": total}
+        ch = resolve(spec, ctx)
+        # The grade vocabulary travels with the chapter: a doctor's later edit
+        # is validated against what this generation actually offered.
+        ch["gradeValues"] = list(spec.grade_values)
+        ctx.resolved[spec.id] = ch
+        chapters.append(ch)
     failed = [c["id"] for c in chapters if c["status"] == "failed"]
     status = "partial" if failed else "ok"
 
@@ -256,6 +270,22 @@ def _same(a: Any, b: Any) -> bool:
 
 # -------------------------------------------------------------- overrides
 
+def _grade_values(doc: dict[str, Any], chapter_id: str | None) -> tuple[str, ...]:
+    """The grades this chapter accepts, as recorded when it was generated.
+
+    Read off the stored chapter rather than the template: a document that was
+    generated under an older template must keep validating against the
+    vocabulary it was actually written with.
+    """
+    for ch in doc.get("chapters") or []:
+        if ch.get("id") == chapter_id:
+            vals = ch.get("gradeValues")
+            if vals:
+                return tuple(vals)
+    from .template import DEFAULT_GRADE_SCALE, GRADE_SCALES
+    return GRADE_SCALES[DEFAULT_GRADE_SCALE]
+
+
 def set_override(conn: sqlite3.Connection, doc_id: int, target: dict[str, Any],
                  value: Any, editor: str, reason: str = "") -> dict[str, Any]:
     doc = get_document_by_id(conn, doc_id)
@@ -277,8 +307,10 @@ def set_override(conn: sqlite3.Connection, doc_id: int, target: dict[str, Any],
             raise ValueError("数值必须是数字") from None
         if value != value or value in (float("inf"), float("-inf")):
             raise ValueError("数值必须有限")
-    if kind == "grade" and str(value) not in GRADE_VALUES:
-        raise ValueError("分级只能是 %s" % "/".join(GRADE_VALUES))
+    if kind == "grade":
+        allowed = _grade_values(doc, target.get("chapter"))
+        if str(value) not in allowed:
+            raise ValueError("分级只能是 %s" % "/".join(allowed))
     if kind in ("prose", "item"):
         value = str(value)
         if not value.strip():
@@ -379,3 +411,60 @@ def _ensure_meshes(conn: sqlite3.Connection, cfg: Any, seg_id: int) -> None:
                    and cache.mesh_path(row["seg_key"], r["label_value"]).exists())]
     if not current:
         build_meshes_for_segmentation(conn, cfg, seg_id)
+
+
+def _structures(conn: sqlite3.Connection, cfg: Any, seg_id: int,
+                tpl: ReportTemplate) -> dict[str, Any]:
+    """Model-segmented structures for this segmentation's series, by chapter.
+
+    Only label sets a chapter asked for are looked at, so dropping an
+    unrelated prediction into the tree cannot make a chapter appear.
+    """
+    from ..labels import get_labelset
+    from ..scan.predictions import model_segmentations
+    from ..seg.ingest import materialize_segmentation
+
+    wanted = {c.model_label_set: c.id for c in tpl.chapters
+              if c.source == "model" and c.model_label_set}
+    if not wanted:
+        return {}
+    row = conn.execute("SELECT series_id FROM segmentation WHERE id=?", (seg_id,)).fetchone()
+    if row is None or row["series_id"] is None:
+        return {}
+
+    out: dict[str, Any] = {}
+    for seg in model_segmentations(conn, int(row["series_id"])):
+        chapter = wanted.get(seg["label_set_key"])
+        if chapter is None or chapter in out:      # newest row per chapter wins
+            continue
+        try:
+            if seg["seg_state"] != "ready" or not seg["stats_json"]:
+                materialize_segmentation(conn, cfg, int(seg["id"]))
+                seg = conn.execute("SELECT sg.*, ls.key AS label_set_key FROM segmentation sg"
+                                   " LEFT JOIN label_set ls ON ls.id=sg.label_set_id"
+                                   " WHERE sg.id=?", (seg["id"],)).fetchone()
+        except Exception as exc:                   # noqa: BLE001 - one structure, not the report
+            out[chapter] = {"error": "%s: %s" % (type(exc).__name__, exc), "labels": []}
+            continue
+        if seg["seg_state"] != "ready" or not seg["stats_json"]:
+            continue
+        stats = json.loads(seg["stats_json"])
+        defs = {int(l["value"]): l for l in
+                (get_labelset(conn, seg["label_set_key"]) or {}).get("labels", [])}
+        labels = []
+        for lab in stats.get("labels") or []:
+            d = defs.get(int(lab["value"]), {})
+            lo, hi = (lab.get("sliceRange") or [0, -1])[:2]
+            labels.append({
+                "value": int(lab["value"]),
+                "nameZh": d.get("nameZh") or d.get("name"), "nameEn": d.get("name"),
+                "volumeCm3": lab.get("volumeCm3"), "volumeMm3": lab.get("volumeMm3"),
+                "sliceRange": lab.get("sliceRange"), "nSlices": int(hi) - int(lo) + 1,
+                "extentMm": lab.get("extentMm"),
+            })
+        out[chapter] = {
+            "segmentationId": int(seg["id"]), "state": seg["seg_state"],
+            "model": seg["model_name"], "version": seg["model_version"],
+            "labelSet": seg["label_set_key"], "labels": labels,
+        }
+    return out

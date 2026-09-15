@@ -1,0 +1,13 @@
+# 半月板标签集 —— 由模型分割，不是本院金标准。
+#
+# 值从 9 开始，与软骨标签集（1-8）不重叠：两套标签将来若要合成一张标签图
+# 同屏显示，值必须互不冲突。
+#
+# 模型把结果写成 <predictions_root>/<model>/<version>/<series_uid>/knee_meniscus_v1.nii.gz
+# 即可被 `mrictl predictions` 收入（见 server/src/mriviewer/scan/predictions.py）。
+key: knee_meniscus_v1
+name: 膝关节半月板（模型）
+name_en: Knee menisci (model)
+labels:
+  - {value: 9,  name: Medial meniscus,  name_zh: 内侧半月板, color: "#4363D8", opacity: 0.75, group: meniscus}
+  - {value: 10, name: Lateral meniscus, name_zh: 外侧半月板, color: "#F032E6", opacity: 0.75, group: meniscus}

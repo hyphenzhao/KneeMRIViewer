@@ -157,7 +157,7 @@ try {
   await popup.waitForSelector('[data-report-ready="1"]', { timeout: 240000 })
   const rep2 = await popup.evaluate(() => {
     const titles = [...document.querySelectorAll('.rp-chapter h3, .rp-chapter h2')]
-      .map((e) => e.textContent?.replace(/\s+/g, '').replace(/(算法生成|模型解读|未评估|生成失败)$/, ''))
+      .map((e) => e.textContent?.replace(/\s+/g, '').replace(/(算法生成|模型解读|模型分割|未评估|生成失败)$/, ''))
     const pending = [...document.querySelectorAll('.rp-chapter-pending')]
     return {
       titles,

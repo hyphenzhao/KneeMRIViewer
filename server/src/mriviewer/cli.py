@@ -35,6 +35,7 @@ def cmd_init(args) -> int:
 
 
 def cmd_scan(args) -> int:
+    from .scan.predictions import ingest_predictions
     from .scan.runner import scan_dataset
     cfg = load_config(args.config)
     cfg.ensure_dirs()
@@ -55,7 +56,30 @@ def cmd_scan(args) -> int:
                              progress=_progress)
         stats["seconds"] = round(time.time() - t0, 1)
         print("  " + json.dumps(stats, ensure_ascii=False))
+    # Predictions are keyed by SeriesInstanceUID, not by dataset, so they are
+    # ingested once per run rather than once per dataset.
+    if cfg.predictions_roots:
+        pred = ingest_predictions(conn, cfg)
+        print("predictions " + json.dumps(pred, ensure_ascii=False))
     return rc
+
+
+def cmd_predictions(args) -> int:
+    """Register model outputs dropped into predictions_roots."""
+    from .scan.predictions import ingest_predictions
+    cfg = load_config(args.config)
+    cfg.ensure_dirs()
+    conn = init_db(cfg.db_path)
+    load_labelset_files(conn, cfg.labelsets_dir)
+    if not cfg.predictions_roots:
+        print("no predictions_roots configured")
+        return 1
+    stats = ingest_predictions(conn, cfg)
+    print(json.dumps(stats, ensure_ascii=False))
+    if stats["unmatched"] or stats["no_label_set"]:
+        print("see the scan_error table for the files that were refused")
+        return 1
+    return 0
 
 
 def cmd_materialize(args) -> int:
@@ -237,6 +261,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--workers", type=int)
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_scan)
+
+    sub.add_parser("predictions", help="register model outputs from predictions_roots"
+                   ).set_defaults(func=cmd_predictions)
 
     p = sub.add_parser("materialize", help="tier-2 volume + labelmap cache")
     p.add_argument("-d", "--dataset")

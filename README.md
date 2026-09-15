@@ -265,16 +265,49 @@ tier 2 也会在浏览器第一次打开该序列时自动触发。两级都按
 
 ---
 
-## 接入新的分割结果（给日后的算法实验留的口子）
+## 接入模型的分割结果
 
-往 `predictions_roots` 里丢文件即可，**不需要改代码**：
+**本平台不跑模型。** 模型在哪儿跑都行——自己的 venv、另一台 GPU 机器、另一栋楼——
+把标签图写成 NIfTI 丢进 `predictions_roots`，平台负责把它接进来：
 
 ```
 <predictions_root>/<model>/<version>/<series_uid>/<labelset>.nii.gz
 ```
 
-入库时会校验维度和 affine 与目标序列一致，不一致直接拒绝并在界面上报错。
-页面上它会变成分割下拉里的一个新版本，可与「原始标注」并排切换对比。
+`mrictl predictions` 收录（`mrictl scan` 末尾也会自动跑一次）。规则：
+
+- **按 SeriesInstanceUID 绑定序列**，不猜。数据集自带的金标准是按「该患者的第一个序列」
+  关联的，那在一个检查只有一个序列时没问题，一旦有了冠状位就会错配——而模型恰恰最可能
+  在多平面数据上跑。对不上的 UID 记进 `scan_error`，不入库。
+- **标签集必须已存在**（文件名就是标签集 key）。拼错不会自动造一个灰色「Label 9」的标签集，
+  那看起来像导入成功了。
+- 维度和 affine 必须与目标序列一致（`seg/nifti_io.py::derive_transform`），不一致直接拒绝。
+- 入库后它与金标准**并存于同一序列**，`origin='model'`、记录 `model_name/model_version`，
+  阅片页的分割下拉里可以来回切换对比。
+
+为什么是这种"平台外推理"：PyTorch 的 CUDA 轮子 800 MB–2.5 GB，会淹掉整个离线安装包
+（现在全部依赖加起来才几十 MB），而且 nnU-Net / torch 的依赖与许可风险不该进产品。
+推理机需要 GPU，服务端不需要。
+
+### 让一个章节由模型来填
+
+报告模板里把该章的 `source: pending` 改成 `source: model`，并写上它吃哪个标签集：
+
+```yaml
+  - id: meniscus
+    source: model
+    model_label_set: knee_meniscus_v1
+    grade_scale: stoller          # 分级词表按章节走，不是所有结构都用 Outerbridge
+```
+
+然后就没有然后了——不需要改代码。该病例**有**对应标签图才会有正文；没有的病例仍然显示
+「本次未评估」占位。正文只说标签图能支持的事（分割出了哪些结构、体积、跨多少原始层），
+并带一条写明模型名与版本、未在本院本序列验证的注意事项。**撕裂、变性、信号这类判断需要
+另一个模型或一条我们验证过的规则，在那之前这一章不得暗示它们。**
+
+各章节的词表都是独立的（`ai/guardrail.py` 的 `banned_terms` / `allowed_codes` /
+`required_sections` 都是参数）：软骨章禁「半月板」，半月板章当然不能禁；软骨章认得 22 个
+亚区代码，半月板章一个都不认。
 
 ---
 
@@ -307,7 +340,7 @@ tier 2 也会在浏览器第一次打开该序列时自动触发。两级都按
 ## 测试
 
 ```bash
-cd server && python -m pytest tests/ -q        # 181 项：几何、体模、分区、平滑、去标识化、护栏、报告框架、分级、图形
+cd server && python -m pytest tests/ -q        # 195 项：几何、体模、分区、平滑、去标识化、护栏、报告框架、分级、图形、模型接入
 node tests/integration_check.mjs               # 对着运行中的服务跑完整数据链路
 node tests/browser_check.mjs                   # 无头 Chromium，逐像素验证四窗口
 node tests/browser_switch_check.mjs            # 病例切换：ID 冲突、残留清空
